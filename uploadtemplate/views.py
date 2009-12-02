@@ -49,6 +49,10 @@ def access(request, template):
                 return render_to_response('uploadtemplate/access.html',
                                       {'data': template_file.read(),
                                        'template': template})
-    elif request.method == 'DELETE':
+    elif request.method == 'DELETE' or (
+        request.method == 'POST' and request.POST.get('delete')):
         os.remove(full_path)
         return HttpResponseRedirect(reverse('uploadtemplate-index'))
+
+    else:
+        raise Http404

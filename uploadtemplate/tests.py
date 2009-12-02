@@ -234,6 +234,24 @@ class ViewTestCase(BaseTestCase):
         self.assertEquals(response.status_code, 200)
         self.assertEquals(response.content, data)
 
+    def test_access_POST_delete(self):
+        """
+        Browsers don't support the DELETE method from forms, so we also support
+        the 'delete' POST argument for deleting templates.
+        """
+        data = 'Template!'
+        self._create_template(data)
+        c = Client()
+        response = c.post(reverse('uploadtemplate-access',
+                                 args=[self.template_name]),
+                          {'delete': 'yes'})
+        self.assertEquals(response.status_code, 302)
+        self.assertEquals(response['Location'],
+                          'http://testserver%s' % (
+                reverse('uploadtemplate-index')))
+        self.assertFalse(os.path.exists(
+                os.path.join(self.tmpdir, self.template_name)))
+
     def test_access_GET_404(self):
         """
         If the template has not been uploaded, the page should be a 404.
