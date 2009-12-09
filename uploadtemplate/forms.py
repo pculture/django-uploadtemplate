@@ -1,69 +1,73 @@
 from __future__ import with_statement
+from ConfigParser import ConfigParser
 import os.path
-import re
+from StringIO import StringIO
+import zipfile
 
-from django.conf import settings
+from django.contrib.sites.models import Site
+from django.core.files.base import ContentFile
 from django import forms
-from django.template import (loader, TemplateDoesNotExist, VARIABLE_TAG_START,
-                             VARIABLE_TAG_END, BLOCK_TAG_START, BLOCK_TAG_END)
 
-UPLOADTEMPLATE_MAX_SIZE = 64 * 2**10 # 64Kb
+from uploadtemplate import models
 
-TAG_RE = re.compile(r'%s(.*?)%s|%s(.*?)%s' % (
-        VARIABLE_TAG_START, VARIABLE_TAG_END, BLOCK_TAG_START, BLOCK_TAG_END))
-SECURITY_RE = re.compile(r'settings[.](SECRET_KEY|ADMINS|MANAGERS|'
-                         r'DATABASE_\w+|USTREAM_\w+|VIMEO_\w+|BITLY_\w+)')
+class ThemeUploadForm(forms.Form):
 
-class TemplateUploadForm(forms.Form):
+    theme = forms.FileField(label="Theme ZIP")
 
-    name = forms.CharField(label='Template Name')
-    template = forms.FileField(label="Template")
-
-
-    def clean_name(self):
-        value = self.cleaned_data.get('name')
+    def clean_theme(self):
+        value = self.cleaned_data.get('theme')
         if not value:
             return value
 
         try:
-            loader.get_template(value)
-        except TemplateDoesNotExist:
-            raise forms.ValidationError('That name is not a valid template.')
-        else:
-            return value
+            zip_file = zipfile.ZipFile(value)
+        except zipfile.error:
+            raise forms.ValidationError('Uploaded theme is not a ZIP file')
 
-    def clean_template(self):
-        value = self.cleaned_data.get('template')
-        if not value:
-            return value
+        if not zip_file.getinfo('meta.ini'):
+            raise forms.ValidationError(
+                'Uploaded theme is invalid: missing meta.ini file')
 
-        if value.size > getattr(settings, 'UPLOADTEMPLATE_MAX_SIZE',
-                                   UPLOADTEMPLATE_MAX_SIZE):
-            raise forms.ValidationError('Uploaded template is too big.')
-        return value
+        return zip_file
 
     def save(self):
         if not self.is_valid():
             raise ValueError("Cannot save an invalid upload.")
 
-        data = self.cleaned_data['template'].read()
-        start = 0
-        match = TAG_RE.search(data)
-        while match:
-            for text in match.groups():
-                if text is not None and SECURITY_RE.search(text):
-                    data = data[:match.start()] + data[match.end():]
-                    start = match.start()
-                    break
-            else:
-                start = match.end()
-            match = TAG_RE.search(data, start)
+        zip_file = self.cleaned_data['theme']
 
-        path = os.path.join(
-            settings.UPLOADTEMPLATE_MEDIA_ROOT,
-            self.cleaned_data['name'])
+        meta_file = StringIO(zip_file.read('meta.ini'))
 
-        os.makedirs(os.path.dirname(path))
+        config = ConfigParser()
+        config.readfp(meta_file, 'meta.ini')
 
-        with file(path, 'w') as template_file:
-            template_file.write(data)
+        theme = models.Theme.objects.create_theme(
+            site = Site.objects.get_current(),
+            name = config.get('Theme', 'name'))
+
+        if config.has_option('Theme', 'thumbnail'):
+            path = config.get('Theme', 'thumbnail')
+            theme.thumbnail.save(path,
+                                 ContentFile(zip_file.read(path)))
+
+        static_root = theme.static_root()
+        template_dir = theme.template_dir()
+
+        for filename in zip_file.namelist():
+            dirname, basename = os.path.split(filename)
+            output_path = None
+            if dirname.startswith('static'):
+                dirname = dirname[len('static/'):]
+                os.makedirs(os.path.join(static_root, dirname))
+                output_path = os.path.join(static_root, dirname,
+                                           basename)
+            elif dirname.startswith('templates'):
+                dirname = dirname[len('templates/'):]
+                os.makedirs(os.path.join(template_dir, dirname))
+                output_path = os.path.join(template_dir, dirname, basename)
+
+            if output_path is not None:
+                with file(output_path, 'wb') as output_file:
+                    output_file.write(zip_file.read(filename))
+
+        return theme

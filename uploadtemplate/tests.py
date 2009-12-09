@@ -1,161 +1,139 @@
+from __future__ import with_statement
 import os.path
 import shutil
 from StringIO import StringIO
 import tempfile
+import zipfile
 
 from django.conf import settings
+from django.contrib.sites.models import Site
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django.test.client import Client
 
 from uploadtemplate import forms
+from uploadtemplate import models
 
 class BaseTestCase(TestCase):
 
     urls = 'uploadtemplate.urls'
-    template_name = 'uploadtemplate/test_template.html'
+    _theme_zip = None
 
     def setUp(self):
-        self.old_MEDIA_ROOT = settings.UPLOADTEMPLATE_MEDIA_ROOT
+        try:
+            Site.objects.get_current()
+        except Site.DoesNotExist:
+            Site.objects.create(
+                pk=settings.SITE_ID,
+                domain='example.com',
+                name='example')
+        self.old_MEDIA_ROOT = settings.MEDIA_ROOT
+        self.old_UPLOAD_MEDIA_ROOT = settings.UPLOADTEMPLATE_MEDIA_ROOT
         self.old_TEMPLATE_LOADERS = settings.TEMPLATE_LOADERS
         self.old_TEMPLATE_DIRS = settings.TEMPLATE_DIRS
         self.old_CONTEXT_PROCESSORS = settings.TEMPLATE_CONTEXT_PROCESSORS
 
         self.tmpdir = tempfile.mkdtemp()
-        settings.UPLOADTEMPLATE_MEDIA_ROOT = self.tmpdir
+        settings.UPLOADTEMPLATE_MEDIA_ROOT = settings.MEDIA_ROOT = self.tmpdir
         settings.TEMPLATE_CONTEXT_PROCESSORS = []
         settings.TEMPLATE_LOADERS = [
+            #'uploadtemplate.loader.load_template_source',
             'django.template.loaders.filesystem.load_template_source']
         settings.TEMPLATE_DIRS = [
-            os.path.join(os.path.dirname(__file__),
-                         'test_templates')]
+            os.path.join(os.path.dirname(__file__), 'testdata', 'templates')]
 
     def tearDown(self):
-        settings.UPLOADTEMPLATE_MEDIA_ROOT = self.old_MEDIA_ROOT
+        settings.UPLOADTEMPLATE_MEDIA_ROOT = self.old_UPLOAD_MEDIA_ROOT
+        settings.MEDIA_ROOT = self.old_MEDIA_ROOT
         settings.TEMPLATE_LOADERS = self.old_TEMPLATE_LOADERS
         settings.TEMPLATE_DIRS = self.old_TEMPLATE_DIRS
         settings.TEMPLATE_CONTEXT_PROCESSORS = self.old_CONTEXT_PROCESSORS
         shutil.rmtree(self.tmpdir)
 
-class TemplateUploadFormTestCase(BaseTestCase):
-    def test_name_required(self):
+    def theme_zip(self):
         """
-        The name of the template is required.
+        Generate/return a ZIP file of the test theme.
         """
-        form = forms.TemplateUploadForm(
-            {},
-            {'template': SimpleUploadedFile('template.html',
-                                            '')})
+        if not self._theme_zip:
+            self._theme_zip = StringIO()
+            zip = zipfile.ZipFile(self._theme_zip, 'w')
+            root = os.path.join(os.path.dirname(__file__),
+                                'testdata', 'theme')
+            for dirname, dirs, files in os.walk(root):
+                for filename in files:
+                    full_path = os.path.join(dirname, filename)
+                    with file(full_path, 'rb') as f:
+                        zip.writestr(full_path[len(root)+1:],
+                                        f.read())
+            zip.close()
+        self._theme_zip.seek(0)
+        return self._theme_zip
+
+class ThemeUploadFormTestCase(BaseTestCase):
+    def test_theme_required(self):
+        """
+        The uploaded theme is required.
+        """
+        form = forms.ThemeUploadForm()
         self.assertFalse(form.is_valid())
 
-    def test_name_must_exist(self):
+    def test_zip_required(self):
         """
-        The name of the template must be an already existing template.
+        The uploaded theme must be a ZIP file.
         """
-        form = forms.TemplateUploadForm(
-            {'name': 'uploadtemplate/invalid_template.html'},
-            {'template': SimpleUploadedFile('template.html',
-                                            '')})
+        form = forms.ThemeUploadForm({},
+            {'theme': SimpleUploadedFile('theme.zip',
+                                         'Not a ZIP file!')})
         self.assertFalse(form.is_valid())
 
-    def test_template_required(self):
+    def test_meta_ini_required(self):
         """
-        The uploaded template is required.
+        The uploaded theme must have a meta.ini file.
         """
-        form = forms.TemplateUploadForm(
-            {'name': self.template_name})
+        si = StringIO()
+        zip = zipfile.ZipFile(si, 'w')
+        zip.close()
+        si.seek(0)
+
+        form = forms.ThemeUploadForm({},
+            {'theme': SimpleUploadedFile('theme.zip',
+                                         si.read())})
         self.assertFalse(form.is_valid())
 
     def test_upload(self):
         """
-        TemplateUploadForm().save() should write the given template to
-        settings.UPLOADTEMPLATE_MEDIA_ROOT.
+        ThemeUploadForm().save() should write the given theme to
+        settings.UPLOADTEMPLATE_MEDIA_ROOT and create a Theme object..
         """
-        form = forms.TemplateUploadForm(
-            {'name': self.template_name},
-            {'template': SimpleUploadedFile('template.html',
-                                            'Template!')})
-        self.assertTrue(form.is_valid())
-        form.save()
-        self.assertEquals(file(os.path.join(
-                    self.tmpdir, self.template_name)).read(),
-                          'Template!')
+        form = forms.ThemeUploadForm({},
+            {'theme': SimpleUploadedFile('theme.zip',
+                                         self.theme_zip().read())})
+        self.assertTrue(form.is_valid(), form.errors)
 
-    def test_security_variable(self):
-        """
-        If the uploaded template uses a variable that's security related (like
-        SECRET_KEY), that variable tag should be stripped from the saved
-        template.
-        """
-        form = forms.TemplateUploadForm(
-            {'name': self.template_name},
-            {'template': SimpleUploadedFile('template.html',
-                                            '-{{ settings.SECRET_KEY }}-')})
-        self.assertTrue(form.is_valid())
-        form.save()
-        self.assertEquals(file(os.path.join(
-                    self.tmpdir, self.template_name)).read(),
-                          '--')
-
-    def test_security_block(self):
-        """
-        If the uploaded template uses a block tag that includes a variable
-        that's security related, that block tag should be stripped from the
-        saved template.
-        """
-        form = forms.TemplateUploadForm(
-            {'name': self.template_name},
-            {'template': SimpleUploadedFile(
-                    'template.html',
-                    '-{% for settings.SECRET_KEY %}-')})
-        self.assertTrue(form.is_valid())
-        form.save()
-        self.assertEquals(file(os.path.join(
-                    self.tmpdir, self.template_name)).read(),
-                          '--')
-
-    def test_variable(self):
-        """
-        Non-security veriables should be passed through unchanged.
-        """
-        form = forms.TemplateUploadForm(
-            {'name': self.template_name},
-            {'template': SimpleUploadedFile(
-                    'template.html',
-                    '-{{ settings.MEDIA_ROOT }}-')})
-        self.assertTrue(form.is_valid())
-        form.save()
-        self.assertEquals(file(os.path.join(
-                    self.tmpdir, self.template_name)).read(),
-                          '-{{ settings.MEDIA_ROOT }}-')
-
-    def test_block(self):
-        """
-        Non-security blocks should be passed through unchanged.
-        """
-        form = forms.TemplateUploadForm(
-            {'name': self.template_name},
-            {'template': SimpleUploadedFile(
-                    'template.html',
-                    '-{% for settings.MEDIA_ROOT %}-')})
-        self.assertTrue(form.is_valid())
-        form.save()
-        self.assertEquals(file(os.path.join(
-                    self.tmpdir, self.template_name)).read(),
-                          '-{% for settings.MEDIA_ROOT %}-')
-
+        theme = form.save()
+        self.assertTrue(theme.default)
+        self.assertEquals(theme.name, 'UploadTemplate Test Theme')
+        self.assertEquals(theme.thumbnail.name,
+                          'uploadtemplate/theme_thumbnails/thumbnail.gif')
+        self.assertTrue(theme.static_root().startswith(
+                settings.UPLOADTEMPLATE_MEDIA_ROOT))
+        self.assertTrue(theme.template_dir().startswith(
+                settings.UPLOADTEMPLATE_MEDIA_ROOT))
+        self.assertTrue(os.path.exists(os.path.join(theme.static_root(),
+                                                    'logo.png')))
+        self.assertTrue(os.path.exists(os.path.join(theme.template_dir(),
+                                                    'index.html')))
 
 class ViewTestCase(BaseTestCase):
 
-    def _create_template(self, content=''):
-        """
-        Create a fake template for testing.
-        """
-        os.makedirs(os.path.join(self.tmpdir, 'uploadtemplate'))
-        f = file(os.path.join(self.tmpdir, self.template_name), 'w')
-        f.write(content)
-        f.close()
+    def setUp(self):
+        BaseTestCase.setUp(self)
+        form = forms.ThemeUploadForm(
+            {},
+            {'theme': SimpleUploadedFile('theme.zip',
+                                         self.theme_zip().read())})
+        self.theme = form.save()
 
     def test_index_GET(self):
         """
@@ -163,14 +141,16 @@ class ViewTestCase(BaseTestCase):
         'uploadtemplate/index.html' template, and include as the 'templates'
         variable the list of uploaded templates.
         """
-        self._create_template()
         c = Client()
         response = c.get(reverse('uploadtemplate-index'))
         self.assertEquals(response.status_code, 200)
         self.assertEquals(response.template.name, 'uploadtemplate/index.html')
-        self.assertEquals(response.context['templates'], [self.template_name])
+        self.assertEquals(response.context['default'], self.theme)
+        self.assertEquals(list(response.context['themes']),
+                          [self.theme])
+        self.assertEquals(list(response.context['non_default_themes']), [])
         self.assertTrue(isinstance(response.context['form'],
-                                   forms.TemplateUploadForm))
+                                   forms.ThemeUploadForm))
 
     def test_index_POST_invalid(self):
         """
@@ -181,108 +161,51 @@ class ViewTestCase(BaseTestCase):
         response = c.post(reverse('uploadtemplate-index'))
         self.assertEquals(response.status_code, 200)
         self.assertEquals(response.template.name, 'uploadtemplate/index.html')
-        self.assertEquals(response.context['templates'], [])
+        self.assertEquals(response.context['default'], self.theme)
         self.assertTrue(response.context['form'].is_bound)
         self.assertFalse(response.context['form'].is_valid())
 
-    def test_index_POSY(self):
+    def test_index_POST(self):
         """
-        A valid POST request should save the uploaded template and redirect
+        A valid POST request should save the uploaded theme and redirect
         back to the index page.
         """
-        f = StringIO('Template!')
-        f.name = 'template.html' # Django's test client needs this attribute
+        self.theme.name = 'Old Theme'
+        self.theme.save()
+
+        f = self.theme_zip()
+        f.name = 'theme.zip'
+
         c = Client()
         response = c.post(reverse('uploadtemplate-index'),
-                          {'name': self.template_name,
-                          'template': f})
+                          {'theme': f})
         self.assertEquals(response.status_code, 302)
         self.assertEquals(response['Location'],
                           'http://testserver%s' % (
                 reverse('uploadtemplate-index')))
-        self.assertEquals(file(os.path.join(
-                    self.tmpdir, self.template_name)).read(),
-                          'Template!')
 
-    def test_access_GET(self):
-        """
-        A GET request to the access view should render the
-        'uploadtemplate/access.html' template and have the text of the template
-        in the context.
-        """
-        data = 'Template!'
-        self._create_template(data)
-        c = Client()
-        response = c.get(reverse('uploadtemplate-access',
-                                 args=[self.template_name]))
-        self.assertEquals(response.status_code, 200)
-        self.assertEquals(response.template.name, 'uploadtemplate/access.html')
-        self.assertEquals(response.context['template'], self.template_name)
-        self.assertEquals(response.context['data'], data)
+        self.assertEquals(models.Theme.objects.count(), 2)
+        self.assertEquals(models.Theme.objects.get_default().pk, 2)
 
-    def test_access_GET_raw(self):
-        """
-        A GET request to the access view with GET['format'] = 'raw' should just
-        return the raw template data.
-        """
-        data = 'Template!'
-        self._create_template(data)
-        c = Client()
-        response = c.get(reverse('uploadtemplate-access',
-                                 args=[self.template_name]),
-                         {'format': 'raw'})
-        self.assertEquals(response.status_code, 200)
-        self.assertEquals(response.content, data)
 
-    def test_access_POST_delete(self):
+    def test_set_default(self):
         """
-        Browsers don't support the DELETE method from forms, so we also support
-        the 'delete' POST argument for deleting templates.
+        A request to the set_default view should change the default theme.
         """
-        data = 'Template!'
-        self._create_template(data)
+        self.theme.name = 'Old Theme'
+        self.theme.save()
+
+        form = forms.ThemeUploadForm(
+            {}, {'theme': SimpleUploadedFile('theme.zip',
+                                             self.theme_zip().read())})
+        form.save()
+
         c = Client()
-        response = c.post(reverse('uploadtemplate-access',
-                                 args=[self.template_name]),
-                          {'delete': 'yes'})
+        response = c.get(self.theme.get_absolute_url())
         self.assertEquals(response.status_code, 302)
         self.assertEquals(response['Location'],
                           'http://testserver%s' % (
                 reverse('uploadtemplate-index')))
-        self.assertFalse(os.path.exists(
-                os.path.join(self.tmpdir, self.template_name)))
 
-    def test_access_GET_404(self):
-        """
-        If the template has not been uploaded, the page should be a 404.
-        """
-        c = Client()
-        response = c.get(reverse('uploadtemplate-access',
-                                 args=[self.template_name]))
-        self.assertEquals(response.status_code, 404)
-
-    def test_access_DELETE(self):
-        """
-        A DELETE request to the access view should delete the template and
-        redirect back to the indes view.
-        """
-        data = 'Template!'
-        self._create_template(data)
-        c = Client()
-        response = c.delete(reverse('uploadtemplate-access',
-                                 args=[self.template_name]))
-        self.assertEquals(response.status_code, 302)
-        self.assertEquals(response['Location'],
-                          'http://testserver%s' % (
-                reverse('uploadtemplate-index')))
-        self.assertFalse(os.path.exists(
-                os.path.join(self.tmpdir, self.template_name)))
-
-    def test_access_DELETE_404(self):
-        """
-        If the template has not been uploaded, the page should be a 404.
-        """
-        c = Client()
-        response = c.get(reverse('uploadtemplate-access',
-                                 args=[self.template_name]))
-        self.assertEquals(response.status_code, 404)
+        theme = models.Theme.objects.get_default()
+        self.assertEquals(theme, self.theme)

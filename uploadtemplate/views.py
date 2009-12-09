@@ -4,9 +4,10 @@ import os
 from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, get_object_or_404
 
 from uploadtemplate import forms
+from uploadtemplate import models
 
 def index(request):
     """
@@ -14,12 +15,12 @@ def index(request):
     show a list of the currently uploaded templates.
     """
     if request.method == 'POST':
-        form = forms.TemplateUploadForm(request.POST, request.FILES)
+        form = forms.ThemeUploadForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             return HttpResponseRedirect(request.path)
     else:
-        form = forms.TemplateUploadForm()
+        form = forms.ThemeUploadForm()
 
     templates = []
     for dirpath, dirnames, filenames in os.walk(
@@ -33,26 +34,13 @@ def index(request):
 
     return render_to_response('uploadtemplate/index.html',
                               {'form': form,
-                               'templates': templates})
+                               'default': models.Theme.objects.get_default(),
+                               'themes': models.Theme.objects.all(),
+                               'non_default_themes':
+                                   models.Theme.objects.exclude(default=True),
+                               })
 
-def access(request, template):
-    full_path = os.path.join(settings.UPLOADTEMPLATE_MEDIA_ROOT, template)
-    if not os.path.exists(full_path):
-        raise Http404
-
-    if request.method == 'GET':
-        format = request.GET.get('format', 'html')
-        with file(full_path, 'r') as template_file:
-            if format == 'raw':
-                return HttpResponse(template_file.read())
-            else:
-                return render_to_response('uploadtemplate/access.html',
-                                      {'data': template_file.read(),
-                                       'template': template})
-    elif request.method == 'DELETE' or (
-        request.method == 'POST' and request.POST.get('delete')):
-        os.remove(full_path)
-        return HttpResponseRedirect(reverse('uploadtemplate-index'))
-
-    else:
-        raise Http404
+def set_default(request, theme_id):
+    theme = get_object_or_404(models.Theme, pk=theme_id)
+    theme.set_as_default()
+    return HttpResponseRedirect(reverse('uploadtemplate-index'))
