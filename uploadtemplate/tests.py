@@ -228,3 +228,44 @@ class ViewTestCase(BaseTestCase):
 
         theme = models.Theme.objects.get_default()
         self.assertEquals(theme, self.theme)
+
+    def test_delete(self):
+        """
+        A request to the delete view should remove the theme and all its files,
+        then redirect back to the index.
+        """
+        thumbnail_file = self.theme.thumbnail.path
+        static_root = self.theme.static_root()
+        template_dir = self.theme.template_dir()
+
+        c = Client()
+        response = c.get(reverse('uploadtemplate-delete',
+                                 args=[self.theme.pk]))
+        self.assertEquals(response.status_code, 302)
+        self.assertEquals(response['Location'],
+                          'http://testserver%s' % (
+                reverse('uploadtemplate-index')))
+
+        self.assertEquals(models.Theme.objects.count(), 0)
+        self.assertFalse(os.path.exists(thumbnail_file))
+        self.assertFalse(os.path.exists(static_root))
+        self.assertFalse(os.path.exists(template_dir))
+
+    def test_download(self):
+        """
+        A request to the download view should return an HttpResponse with the
+        ZIP file of the given theme.
+        """
+        c = Client()
+        response = c.get(reverse('uploadtemplate-download',
+                                 args=[self.theme.pk]))
+        self.assertEquals(response.status_code, 200)
+        self.assertEquals(response['content-type'], 'application/zip')
+
+        sio = StringIO(''.join(response))
+        zip_file = zipfile.ZipFile(sio, 'r')
+        self.assertEquals(zip_file.namelist(),
+                          ['thumbnail.gif',
+                           'meta.ini',
+                           'static/logo.png',
+                           'templates/index.html'])

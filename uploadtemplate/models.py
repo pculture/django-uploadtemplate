@@ -1,4 +1,8 @@
+from ConfigParser import ConfigParser
+import os.path
 import shutil
+from StringIO import StringIO
+import zipfile
 
 from django.conf import settings
 from django.db import models
@@ -73,3 +77,32 @@ class Theme(models.Model):
     def template_dir(self):
         return '%s/templates/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT,
                                      self.pk)
+
+    def zip_file(self, file_object):
+        """
+        Writes the ZIP file for this theme to file_object.
+        """
+        zip_file = zipfile.ZipFile(file_object, 'w')
+        config = ConfigParser()
+        config.add_section('Theme')
+        config.set('Theme', 'name', self.name)
+        config.set('Theme', 'description', self.description)
+        if self.thumbnail:
+            name = os.path.basename(self.thumbnail.name)
+            config.set('Theme', 'thumbnail', name)
+            zip_file.writestr(name.encode('utf8'), self.thumbnail.read())
+
+        meta_ini = StringIO()
+        config.write(meta_ini)
+
+        zip_file.writestr('meta.ini', meta_ini.getvalue())
+
+        for zip_dir, root in (('static', self.static_root()),
+                              ('templates', self.template_dir())):
+            for dirname, dirs, files in os.walk(root):
+                for filename in files:
+                    fullpath = os.path.join(dirname, filename)
+                    zip_file.write(fullpath, os.path.join(
+                            zip_dir, fullpath[len(root):]))
+
+        zip_file.close()

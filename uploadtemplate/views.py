@@ -1,7 +1,8 @@
 from __future__ import with_statement
+from StringIO import StringIO
 
 from django.core.urlresolvers import reverse
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
 
@@ -39,3 +40,15 @@ def set_default(request, theme_id):
     theme = get_object_or_404(models.Theme, pk=theme_id)
     theme.set_as_default()
     return HttpResponseRedirect(reverse('uploadtemplate-index'))
+
+def delete(request, theme_id):
+    theme = get_object_or_404(models.Theme, pk=theme_id)
+    theme.delete()
+    return HttpResponseRedirect(reverse('uploadtemplate-index'))
+
+def download(request, theme_id):
+    theme = get_object_or_404(models.Theme, pk=theme_id)
+    sio = StringIO()
+    theme.zip_file(sio)
+    sio.seek(0)
+    return HttpResponse(sio, content_type='application/zip')
