@@ -1,10 +1,9 @@
 from __future__ import with_statement
-import os
 
-from django.conf import settings
 from django.core.urlresolvers import reverse
-from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response, get_object_or_404
+from django.template import RequestContext
 
 from uploadtemplate import forms
 from uploadtemplate import models
@@ -33,7 +32,8 @@ def index(request):
                                'themes': models.Theme.objects.all(),
                                'non_default_themes':
                                    models.Theme.objects.exclude(default=True),
-                               })
+                               },
+                              context_instance=RequestContext(request))
 
 def set_default(request, theme_id):
     theme = get_object_or_404(models.Theme, pk=theme_id)
