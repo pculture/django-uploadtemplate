@@ -22,19 +22,14 @@ def index(request):
     else:
         form = forms.ThemeUploadForm()
 
-    templates = []
-    for dirpath, dirnames, filenames in os.walk(
-        settings.UPLOADTEMPLATE_MEDIA_ROOT):
-        for filename in filenames:
-            full_path = os.path.join(dirpath, filename)
-            short_path = full_path[len(settings.UPLOADTEMPLATE_MEDIA_ROOT):]
-            if short_path[0] == os.sep:
-                short_path = short_path[1:]
-            templates.append(short_path)
+    try:
+        default = models.Theme.objects.get_default()
+    except models.Theme.DoesNotExist:
+        default = None
 
     return render_to_response('uploadtemplate/index.html',
                               {'form': form,
-                               'default': models.Theme.objects.get_default(),
+                               'default': default,
                                'themes': models.Theme.objects.all(),
                                'non_default_themes':
                                    models.Theme.objects.exclude(default=True),

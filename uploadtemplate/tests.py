@@ -152,6 +152,23 @@ class ViewTestCase(BaseTestCase):
         self.assertTrue(isinstance(response.context['form'],
                                    forms.ThemeUploadForm))
 
+    def test_index_GET_no_default(self):
+        """
+        The GET request to the index should not fail if there's no default
+        theme.
+        """
+        self.theme.delete()
+
+        c = Client()
+        response = c.get(reverse('uploadtemplate-index'))
+        self.assertTrue(response.status_code, 200)
+        self.assertEquals(response.template.name, 'uploadtemplate/index.html')
+        self.assertEquals(response.context['default'], None)
+        self.assertEquals(list(response.context['themes']), [])
+        self.assertEquals(list(response.context['non_default_themes']), [])
+        self.assertTrue(isinstance(response.context['form'],
+                                   forms.ThemeUploadForm))
+
     def test_index_POST_invalid(self):
         """
         An invalid POST request to the index view should re-render the template
