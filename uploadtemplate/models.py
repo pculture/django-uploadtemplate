@@ -1,3 +1,5 @@
+import shutil
+
 from django.conf import settings
 from django.db import models
 
@@ -50,11 +52,22 @@ class Theme(models.Model):
     def get_absolute_url(self):
         return ['uploadtemplate-set_default', (self.pk,)]
 
+    def delete(self, *args, **kwargs):
+        if self.default:
+            # clear the cache
+            Theme.objects._default_cache = None
+        shutil.rmtree(self.static_root())
+        shutil.rmtree(self.template_dir())
+        models.Model.delete(self, *args, **kwargs)
+
     def set_as_default(self):
         Theme.objects.set_default(self)
 
     def static_root(self):
         return '%s/static/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT, self.pk)
+
+    def static_url(self):
+        return '%s/static/%i' % (settings.UPLOADTEMPLATE_MEDIA_URL, self.pk)
 
     def template_dir(self):
         return '%s/templates/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT,
