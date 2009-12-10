@@ -67,7 +67,7 @@ class Theme(models.Model):
         return '%s/static/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT, self.pk)
 
     def static_url(self):
-        return '%s/static/%i' % (settings.UPLOADTEMPLATE_MEDIA_URL, self.pk)
+        return '%s/static/%i/' % (settings.UPLOADTEMPLATE_MEDIA_URL, self.pk)
 
     def template_dir(self):
         return '%s/templates/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT,
