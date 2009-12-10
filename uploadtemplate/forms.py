@@ -45,6 +45,10 @@ class ThemeUploadForm(forms.Form):
             site = Site.objects.get_current(),
             name = config.get('Theme', 'name'))
 
+        if config.has_option('Theme', 'description'):
+            theme.description = config.get('Theme', 'description')
+            theme.save()
+
         if config.has_option('Theme', 'thumbnail'):
             path = config.get('Theme', 'thumbnail')
             theme.thumbnail.save(path,

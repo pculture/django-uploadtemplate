@@ -114,6 +114,8 @@ class ThemeUploadFormTestCase(BaseTestCase):
         theme = form.save()
         self.assertTrue(theme.default)
         self.assertEquals(theme.name, 'UploadTemplate Test Theme')
+        self.assertEquals(theme.description,
+                          'This is the description of the test theme.')
         self.assertEquals(theme.thumbnail.name,
                           'uploadtemplate/theme_thumbnails/thumbnail.gif')
         self.assertTrue(theme.static_root().startswith(

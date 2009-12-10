@@ -38,6 +38,7 @@ class Theme(models.Model):
     name = models.CharField(max_length=255)
     thumbnail = models.ImageField(upload_to='uploadtemplate/theme_thumbnails',
                                   blank=True)
+    description = models.TextField()
     default = models.BooleanField(default=False)
 
     objects = ThemeManager()
