@@ -9,7 +9,6 @@ from django.db import models
 
 class ThemeManager(models.Manager):
 
-    _default_cache = None
 
     def create_theme(self, *args, **kwargs):
         obj = self.create(*args, **kwargs)
@@ -17,24 +16,15 @@ class ThemeManager(models.Manager):
         return obj
 
     def set_default(self, obj):
-        if obj.default:
-            return
-        try:
-            current_default = self.get_default()
-        except obj.DoesNotExist:
-            pass
-        else:
-            current_default.default = False
-            current_default.save()
+        for theme in self.filter(default=True):
+            theme.default = False
+            theme.save()
 
         obj.default = True
         obj.save()
-        self._default_cache = obj
 
     def get_default(self):
-        if self._default_cache is None:
-            self._default_cache = self.get(default=True)
-        return self._default_cache
+        return self.get(default=True)
 
 class Theme(models.Model):
 
@@ -58,9 +48,6 @@ class Theme(models.Model):
         return ['uploadtemplate-set_default', (self.pk,)]
 
     def delete(self, *args, **kwargs):
-        if self.default:
-            # clear the cache
-            Theme.objects._default_cache = None
         shutil.rmtree(self.static_root())
         shutil.rmtree(self.template_dir())
         models.Model.delete(self, *args, **kwargs)
