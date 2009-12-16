@@ -62,12 +62,14 @@ class ThemeUploadForm(forms.Form):
             output_path = None
             if dirname.startswith('static'):
                 dirname = dirname[len('static/'):]
-                os.makedirs(os.path.join(static_root, dirname))
+                if not os.path.exists(os.path.join(static_root, dirname)):
+                    os.makedirs(os.path.join(static_root, dirname))
                 output_path = os.path.join(static_root, dirname,
                                            basename)
             elif dirname.startswith('templates'):
                 dirname = dirname[len('templates/'):]
-                os.makedirs(os.path.join(template_dir, dirname))
+                if not os.path.exists(os.path.join(template_dir, dirname)):
+                    os.makedirs(os.path.join(template_dir, dirname))
                 output_path = os.path.join(template_dir, dirname, basename)
 
             if output_path is not None:
