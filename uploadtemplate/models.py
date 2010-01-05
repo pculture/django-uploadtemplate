@@ -48,8 +48,20 @@ class Theme(models.Model):
         return ['uploadtemplate-set_default', (self.pk,)]
 
     def delete(self, *args, **kwargs):
-        shutil.rmtree(self.static_root())
-        shutil.rmtree(self.template_dir())
+        try:
+            shutil.rmtree(self.static_root())
+        except OSError, e:
+            if e.errno == 2: # no such file:
+                pass
+            else:
+                raise
+        try:
+            shutil.rmtree(self.template_dir())
+        except OSError, e:
+            if e.errno == 2: # no such file
+                pass
+            else:
+                raise
         models.Model.delete(self, *args, **kwargs)
 
     def set_as_default(self):
