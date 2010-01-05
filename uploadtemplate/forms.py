@@ -72,7 +72,7 @@ class ThemeUploadForm(forms.Form):
                     os.makedirs(os.path.join(template_dir, dirname))
                 output_path = os.path.join(template_dir, dirname, basename)
 
-            if output_path is not None:
+            if output_path is not None and not os.path.exists(output_path):
                 with file(output_path, 'wb') as output_file:
                     output_file.write(zip_file.read(filename))
 
