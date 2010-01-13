@@ -8,6 +8,7 @@ import zipfile
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files import storage
 from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django.test.client import Client
@@ -33,6 +34,10 @@ class BaseTestCase(TestCase):
         self.old_TEMPLATE_LOADERS = settings.TEMPLATE_LOADERS
         self.old_TEMPLATE_DIRS = settings.TEMPLATE_DIRS
         self.old_CONTEXT_PROCESSORS = settings.TEMPLATE_CONTEXT_PROCESSORS
+        self.old_STATIC_ROOTS = getattr(settings,
+                                        'UPLOADTEMPLATE_STATIC_ROOTS', [])
+        self.old_TEMPLATE_ROOTS = getattr(settings,
+                                           'UPLOADTEMPLATE_TEMPLATE_ROOTS', [])
 
         self.tmpdir = tempfile.mkdtemp()
         settings.UPLOADTEMPLATE_MEDIA_ROOT = settings.MEDIA_ROOT = self.tmpdir
@@ -42,6 +47,12 @@ class BaseTestCase(TestCase):
             'django.template.loaders.filesystem.load_template_source']
         settings.TEMPLATE_DIRS = [
             os.path.join(os.path.dirname(__file__), 'testdata', 'templates')]
+        models.Theme.__dict__['thumbnail'].field.storage = \
+            storage.FileSystemStorage(self.tmpdir)
+        settings.UPLOADTEMPLATE_STATIC_ROOTS = [os.path.join(
+                os.path.dirname(__file__), 'templatetags')]
+        settings.UPLOADTEMPLATE_TEMPLATE_ROOTS = [os.path.join(
+                os.path.dirname(__file__), 'testdata', 'templates')]
 
     def tearDown(self):
         settings.UPLOADTEMPLATE_MEDIA_ROOT = self.old_UPLOAD_MEDIA_ROOT
@@ -49,6 +60,10 @@ class BaseTestCase(TestCase):
         settings.TEMPLATE_LOADERS = self.old_TEMPLATE_LOADERS
         settings.TEMPLATE_DIRS = self.old_TEMPLATE_DIRS
         settings.TEMPLATE_CONTEXT_PROCESSORS = self.old_CONTEXT_PROCESSORS
+        settings.UPLOADTEMPLATE_STATIC_ROOTS = self.old_STATIC_ROOTS
+        settings.UPLOADTEMPLATE_TEMPLATE_ROOTS = self.old_TEMPLATE_ROOTS
+        models.Theme.__dict__['thumbnail'].field.storage = \
+            storage.default_storage
         shutil.rmtree(self.tmpdir)
 
     def theme_zip(self):
@@ -116,8 +131,9 @@ class ThemeUploadFormTestCase(BaseTestCase):
         self.assertEquals(theme.name, 'UploadTemplate Test Theme')
         self.assertEquals(theme.description,
                           'This is the description of the test theme.')
-        self.assertEquals(theme.thumbnail.name,
-                          'uploadtemplate/theme_thumbnails/thumbnail.gif')
+        self.assertEquals(
+            theme.thumbnail.name,
+            'uploadtemplate/theme_thumbnails/UploadTemplate_Test_Theme.gif')
         self.assertTrue(theme.static_root().startswith(
                 settings.UPLOADTEMPLATE_MEDIA_ROOT))
         self.assertTrue(theme.template_dir().startswith(
@@ -126,6 +142,23 @@ class ThemeUploadFormTestCase(BaseTestCase):
                                                     'logo.png')))
         self.assertTrue(os.path.exists(os.path.join(theme.template_dir(),
                                                     'index.html')))
+
+    def test_reupload(self):
+        """
+        If the theme name already exists, change the name to add a number
+        afterwards.
+        """
+        themes = []
+        for i in range(3):
+            form = forms.ThemeUploadForm(
+                {},
+                {'theme': SimpleUploadedFile('theme.zip',
+                                             self.theme_zip().read())})
+            themes.append(form.save())
+        self.assertEquals([theme.name for theme in themes],
+                          ['UploadTemplate Test Theme',
+                           'UploadTemplate Test Theme 2',
+                           'UploadTemplate Test Theme 3'])
 
 class ViewTestCase(BaseTestCase):
 
@@ -261,11 +294,25 @@ class ViewTestCase(BaseTestCase):
                                  args=[self.theme.pk]))
         self.assertEquals(response.status_code, 200)
         self.assertEquals(response['content-type'], 'application/zip')
+        self.assertEquals(response['content-disposition'],
+                          'attachment; filename=UploadTemplate Test Theme.zip')
 
         sio = StringIO(''.join(response))
         zip_file = zipfile.ZipFile(sio, 'r')
         self.assertEquals(zip_file.namelist(),
-                          ['thumbnail.gif',
-                           'meta.ini',
-                           'static/logo.png',
-                           'templates/index.html'])
+                          [
+                'UploadTemplate Test Theme/UploadTemplate_Test_Theme.gif',
+                'UploadTemplate Test Theme/meta.ini',
+                'UploadTemplate Test Theme/static/uploadtemplate_tags.pyc',
+                'UploadTemplate Test Theme/static/__init__.pyc',
+                'UploadTemplate Test Theme/static/uploadtemplate_tags.py',
+                'UploadTemplate Test Theme/static/__init__.py',
+                'UploadTemplate Test Theme/templates/404.html',
+                'UploadTemplate Test Theme/templates/uploadtemplate/'
+                'test_template.html',
+                'UploadTemplate Test Theme/templates/uploadtemplate/'
+                'index.html',
+                'UploadTemplate Test Theme/templates/uploadtemplate/'
+                'access.html',
+                'UploadTemplate Test Theme/static/logo.png',
+                'UploadTemplate Test Theme/templates/index.html'])

@@ -10,6 +10,13 @@ from django import forms
 
 from uploadtemplate import models
 
+def _zip_prefix(zip_file):
+    meta_files = [name for name in zip_file.namelist()
+                      if os.path.split(name)[1] == 'meta.ini']
+    if not meta_files:
+        return None
+    return os.path.split(meta_files[0])[0]
+
 class ThemeUploadForm(forms.Form):
 
     theme = forms.FileField(label="Theme ZIP")
@@ -24,7 +31,7 @@ class ThemeUploadForm(forms.Form):
         except zipfile.error:
             raise forms.ValidationError('Uploaded theme is not a ZIP file')
 
-        if not zip_file.getinfo('meta.ini'):
+        if _zip_prefix(zip_file) is None:
             raise forms.ValidationError(
                 'Uploaded theme is invalid: missing meta.ini file')
 
@@ -36,7 +43,10 @@ class ThemeUploadForm(forms.Form):
 
         zip_file = self.cleaned_data['theme']
 
-        meta_file = StringIO(zip_file.read('meta.ini'))
+        prefix = _zip_prefix(zip_file)
+
+        meta_file = StringIO(zip_file.read(
+                os.path.join(prefix, 'meta.ini')))
 
         config = ConfigParser()
         config.readfp(meta_file, 'meta.ini')
@@ -51,14 +61,19 @@ class ThemeUploadForm(forms.Form):
 
         if config.has_option('Theme', 'thumbnail'):
             path = config.get('Theme', 'thumbnail')
-            theme.thumbnail.save(path,
-                                 ContentFile(zip_file.read(path)))
+            name, ext = os.path.splitext(path)
+            theme.thumbnail.save(theme.name + ext,
+                                 ContentFile(zip_file.read(
+                        os.path.join(prefix, path))))
 
         static_root = theme.static_root()
         template_dir = theme.template_dir()
 
         for filename in zip_file.namelist():
+            if not filename.startswith(prefix):
+                continue
             dirname, basename = os.path.split(filename)
+            dirname = dirname[len(prefix)+1:]
             output_path = None
             if dirname.startswith('static'):
                 dirname = dirname[len('static/'):]
@@ -71,7 +86,6 @@ class ThemeUploadForm(forms.Form):
                 if not os.path.exists(os.path.join(template_dir, dirname)):
                     os.makedirs(os.path.join(template_dir, dirname))
                 output_path = os.path.join(template_dir, dirname, basename)
-
             if output_path is not None and not os.path.exists(output_path):
                 with file(output_path, 'wb') as output_file:
                     output_file.write(zip_file.read(filename))

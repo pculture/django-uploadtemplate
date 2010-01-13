@@ -11,6 +11,13 @@ class ThemeManager(models.Manager):
 
 
     def create_theme(self, *args, **kwargs):
+        if 'name' in kwargs:
+            name = original_name = kwargs['name']
+            c = 1
+            while self.filter(name=name):
+                c += 1
+                name = '%s %s' % (original_name, c)
+            kwargs['name'] = name
         obj = self.create(*args, **kwargs)
         self.set_default(obj)
         return obj
@@ -89,19 +96,33 @@ class Theme(models.Model):
         if self.thumbnail:
             name = os.path.basename(self.thumbnail.name)
             config.set('Theme', 'thumbnail', name)
-            zip_file.writestr(name.encode('utf8'), self.thumbnail.read())
+            zip_file.writestr('%s/%s' % (self.name.encode('utf8'),
+                                         name.encode('utf8')),
+                              self.thumbnail.read())
 
         meta_ini = StringIO()
         config.write(meta_ini)
 
-        zip_file.writestr('meta.ini', meta_ini.getvalue())
+        zip_file.writestr('%s/meta.ini' % self.name.encode('ascii'),
+                          meta_ini.getvalue())
 
-        for zip_dir, root in (('static', self.static_root()),
-                              ('templates', self.template_dir())):
+        data_paths = [('static', path) for path in
+                      getattr(settings, 'UPLOADTEMPLATE_STATIC_ROOTS', [])]
+        data_paths.extend([
+                ('templates', path) for path in
+                getattr(settings, 'UPLOADTEMPLATE_TEMPLATE_ROOTS', [])])
+        data_paths.append(('static', self.static_root()))
+        data_paths.append(('templates', self.template_dir()))
+
+        for zip_dir, root in data_paths:
             for dirname, dirs, files in os.walk(root):
                 for filename in files:
                     fullpath = os.path.join(dirname, filename)
+                    endpath = fullpath[len(root):]
+                    if endpath[0] == '/':
+                        endpath = endpath[1:]
                     zip_file.write(fullpath, os.path.join(
-                            zip_dir, fullpath[len(root):]))
+                            self.name.encode('utf8'),
+                            zip_dir, endpath))
 
         zip_file.close()
