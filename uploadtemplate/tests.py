@@ -141,6 +141,7 @@ class ThemeUploadFormTestCase(BaseTestCase):
         self.assertTrue(os.path.exists(os.path.join(theme.static_root(),
                                                     'logo.png')))
         self.assertTrue(os.path.exists(os.path.join(theme.template_dir(),
+                                                    'uploadtemplate',
                                                     'index.html')))
 
     def test_reupload(self):
@@ -299,20 +300,19 @@ class ViewTestCase(BaseTestCase):
 
         sio = StringIO(''.join(response))
         zip_file = zipfile.ZipFile(sio, 'r')
-        self.assertEquals(zip_file.namelist(),
+        self.assertEquals(list(sorted(zip_file.namelist())),
                           [
                 'UploadTemplate Test Theme/UploadTemplate_Test_Theme.gif',
                 'UploadTemplate Test Theme/meta.ini',
-                'UploadTemplate Test Theme/static/uploadtemplate_tags.pyc',
-                'UploadTemplate Test Theme/static/__init__.pyc',
-                'UploadTemplate Test Theme/static/uploadtemplate_tags.py',
                 'UploadTemplate Test Theme/static/__init__.py',
+                'UploadTemplate Test Theme/static/__init__.pyc',
+                'UploadTemplate Test Theme/static/logo.png',
+                'UploadTemplate Test Theme/static/uploadtemplate_tags.py',
+                'UploadTemplate Test Theme/static/uploadtemplate_tags.pyc',
                 'UploadTemplate Test Theme/templates/404.html',
                 'UploadTemplate Test Theme/templates/uploadtemplate/'
-                'test_template.html',
+                'access.html',
                 'UploadTemplate Test Theme/templates/uploadtemplate/'
                 'index.html',
                 'UploadTemplate Test Theme/templates/uploadtemplate/'
-                'access.html',
-                'UploadTemplate Test Theme/static/logo.png',
-                'UploadTemplate Test Theme/templates/index.html'])
+                'test_template.html'])

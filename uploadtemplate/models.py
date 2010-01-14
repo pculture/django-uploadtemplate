@@ -114,6 +114,7 @@ class Theme(models.Model):
         data_paths.append(('static', self.static_root()))
         data_paths.append(('templates', self.template_dir()))
 
+        zip_files = {}
         for zip_dir, root in data_paths:
             for dirname, dirs, files in os.walk(root):
                 for filename in files:
@@ -121,8 +122,10 @@ class Theme(models.Model):
                     endpath = fullpath[len(root):]
                     if endpath[0] == '/':
                         endpath = endpath[1:]
-                    zip_file.write(fullpath, os.path.join(
-                            self.name.encode('utf8'),
-                            zip_dir, endpath))
+                    zip_files[os.path.join(self.name.encode('utf8'),
+                                       zip_dir, endpath)] = fullpath
+
+        for zippath, fullpath in zip_files.items():
+            zip_file.write(fullpath, zippath)
 
         zip_file.close()
