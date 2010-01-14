@@ -144,6 +144,46 @@ class ThemeUploadFormTestCase(BaseTestCase):
                                                     'uploadtemplate',
                                                     'index.html')))
 
+    def test_upload_no_enclosing_directory(self):
+        """
+        ThemeUploadForm.save() should work when there isn't an enclosing
+        directory around the theme.
+        """
+        theme_zip = StringIO()
+        zip = zipfile.ZipFile(theme_zip, 'w')
+        root = os.path.join(os.path.dirname(__file__),
+                            'testdata', 'theme', 'UploadTemplate Test Theme')
+        for dirname, dirs, files in os.walk(root):
+            for filename in files:
+                full_path = os.path.join(dirname, filename)
+                with file(full_path, 'rb') as f:
+                    zip.writestr(full_path[len(root)+1:],
+                                 f.read())
+        zip.close()
+        theme_zip.seek(0)
+        form = forms.ThemeUploadForm({},
+            {'theme': SimpleUploadedFile('theme.zip',
+                                         theme_zip.read())})
+        self.assertTrue(form.is_valid(), form.errors)
+
+        theme = form.save()
+        self.assertTrue(theme.default)
+        self.assertEquals(theme.name, 'UploadTemplate Test Theme')
+        self.assertEquals(theme.description,
+                          'This is the description of the test theme.')
+        self.assertEquals(
+            theme.thumbnail.name,
+            'uploadtemplate/theme_thumbnails/UploadTemplate_Test_Theme.gif')
+        self.assertTrue(theme.static_root().startswith(
+                settings.UPLOADTEMPLATE_MEDIA_ROOT))
+        self.assertTrue(theme.template_dir().startswith(
+                settings.UPLOADTEMPLATE_MEDIA_ROOT))
+        self.assertTrue(os.path.exists(os.path.join(theme.static_root(),
+                                                    'logo.png')))
+        self.assertTrue(os.path.exists(os.path.join(theme.template_dir(),
+                                                    'uploadtemplate',
+                                                    'index.html')))
+
     def test_reupload(self):
         """
         If the theme name already exists, change the name to add a number

@@ -70,10 +70,11 @@ class ThemeUploadForm(forms.Form):
         template_dir = theme.template_dir()
 
         for filename in zip_file.namelist():
-            if not filename.startswith(prefix):
+            if prefix and not filename.startswith(prefix):
                 continue
             dirname, basename = os.path.split(filename)
-            dirname = dirname[len(prefix)+1:]
+            if prefix:
+                dirname = dirname[len(prefix)+1:]
             output_path = None
             if dirname.startswith('static'):
                 dirname = dirname[len('static/'):]
