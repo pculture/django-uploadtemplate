@@ -52,6 +52,6 @@ def download(request, theme_id):
     theme.zip_file(sio)
     sio.seek(0)
     response = HttpResponse(sio, content_type='application/zip')
-    response['Content-Disposition'] = 'attachment; filename=%s.zip' % (
+    response['Content-Disposition'] = 'attachment; filename="%s.zip"' % (
         theme.name,)
     return response
