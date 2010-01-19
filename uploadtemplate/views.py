@@ -1,8 +1,10 @@
 from __future__ import with_statement
 from StringIO import StringIO
 
+from django.conf import settings
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponseForbidden
 from django.shortcuts import render_to_response, get_object_or_404
 from django.template import RequestContext
 
@@ -15,6 +17,8 @@ def index(request):
     show a list of the currently uploaded templates.
     """
     if request.method == 'POST':
+        if not getattr(settings, 'UPLOADTEMPLATE_ALLOW_UPLOAD', True):
+            return HttpResponseForbidden()
         form = forms.ThemeUploadForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
