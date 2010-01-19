@@ -282,15 +282,15 @@ class ViewTestCase(BaseTestCase):
 
     def test_index_POST_upload_off(self):
         """
-        If settings.UPLOADTEMPLATE_ALLOW_UPLOAD is False, a POST request should
-        give a 403 Forbidden error.
+        If settings.UPLOADTEMPLATE_DISABLE_UPLOAD is True, a POST request
+        should give a 403 Forbidden error.
         """
         f = self.theme_zip()
         f.name = 'theme.zip'
 
-        old_ALLOW_UPLOAD = getattr(settings, 'UPLOADTEMPLATE_ALLOW_UPLOAD',
-                                   True)
-        settings.UPLOADTEMPLATE_ALLOW_UPLOAD = False
+        old_DISABLE_UPLOAD = getattr(settings, 'UPLOADTEMPLATE_DISABLE_UPLOAD',
+                                   False)
+        settings.UPLOADTEMPLATE_DISABLE_UPLOAD = True
         try:
             c = Client()
             response = c.post(reverse('uploadtemplate-index'),
@@ -298,7 +298,7 @@ class ViewTestCase(BaseTestCase):
             self.assertEquals(response.status_code, 403)
             self.assertEquals(models.Theme.objects.count(), 1)
         finally:
-            settings.UPLOADTEMPLATE_ALLOW_UPLOAD = old_ALLOW_UPLOAD
+            settings.UPLOADTEMPLATE_DISABLE_UPLOAD = old_DISABLE_UPLOAD
 
 
     def test_set_default(self):

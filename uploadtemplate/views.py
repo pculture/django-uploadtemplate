@@ -17,7 +17,7 @@ def index(request):
     show a list of the currently uploaded templates.
     """
     if request.method == 'POST':
-        if not getattr(settings, 'UPLOADTEMPLATE_ALLOW_UPLOAD', True):
+        if getattr(settings, 'UPLOADTEMPLATE_DISABLE_UPLOAD', False):
             return HttpResponseForbidden()
         form = forms.ThemeUploadForm(request.POST, request.FILES)
         if form.is_valid():
