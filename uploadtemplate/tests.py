@@ -336,7 +336,8 @@ class ViewTestCase(BaseTestCase):
         self.assertEquals(response.status_code, 200)
         self.assertEquals(response['content-type'], 'application/zip')
         self.assertEquals(response['content-disposition'],
-                          'attachment; filename=UploadTemplate Test Theme.zip')
+                          'attachment; '
+                          'filename="UploadTemplate Test Theme.zip"')
 
         sio = StringIO(''.join(response))
         zip_file = zipfile.ZipFile(sio, 'r')
