@@ -42,6 +42,8 @@ class Theme(models.Model):
     description = models.TextField()
     default = models.BooleanField(default=False)
 
+    bundled = models.BooleanField(default=False)
+
     objects = ThemeManager()
 
     def __unicode__(self):

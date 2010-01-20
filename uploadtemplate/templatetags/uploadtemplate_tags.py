@@ -19,11 +19,15 @@ class ThemeStaticUrlNode(template.Node):
             try:
                 theme = models.Theme.objects.get_default()
             except models.Theme.DoesNotExist:
+                theme = None
                 base = settings.MEDIA_URL
             else:
                 context['uploadtemplate_theme'] = theme
                 base = theme.static_url()
-        return urlparse.urljoin(base, self.path.resolve(context))
+        path = self.path.resolve(context)
+        if path.startswith('/') and not (theme and theme.bundled):
+            path = path[1:]
+        return urlparse.urljoin(base, path)
 
 @register.tag
 def get_static_url(parser, token):
