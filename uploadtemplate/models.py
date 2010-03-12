@@ -6,9 +6,9 @@ import zipfile
 
 from django.conf import settings
 from django.db import models
+from django.dispatch import Signal
 
 class ThemeManager(models.Manager):
-
 
     def create_theme(self, *args, **kwargs):
         if 'name' in kwargs:
@@ -127,7 +127,15 @@ class Theme(models.Model):
                     zip_files[os.path.join(self.name.encode('utf8'),
                                        zip_dir, endpath)] = fullpath
 
+        for callback, response in pre_zip.send(sender=self,
+                                               file_paths=zip_files):
+            for path in response:
+                if path in zip_files:
+                    del zip_files[path]
+
         for zippath, fullpath in zip_files.items():
             zip_file.write(fullpath, zippath)
 
         zip_file.close()
+
+pre_zip = Signal(providing_args=['file_paths'])
