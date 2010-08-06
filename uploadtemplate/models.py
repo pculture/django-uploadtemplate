@@ -5,8 +5,11 @@ from StringIO import StringIO
 import zipfile
 
 from django.conf import settings
+from django.core.signals import request_finished
 from django.db import models
 from django.dispatch import Signal
+
+THEME_CACHE = None
 
 class ThemeManager(models.Manager):
 
@@ -23,15 +26,24 @@ class ThemeManager(models.Manager):
         return obj
 
     def set_default(self, obj):
+        global THEME_CACHE
         for theme in self.filter(default=True):
             theme.default = False
             theme.save()
 
         obj.default = True
         obj.save()
+        THEME_CACHE = obj
 
     def get_default(self):
-        return self.get(default=True)
+        global THEME_CACHE
+        if THEME_CACHE is None:
+            THEME_CACHE = self.get(default=True)
+        return THEME_CACHE
+
+    def clear_cache(self):
+        global THEME_CACHE
+        THEME_CACHE = None
 
 class Theme(models.Model):
 
@@ -139,3 +151,7 @@ class Theme(models.Model):
         zip_file.close()
 
 pre_zip = Signal(providing_args=['file_paths'])
+
+def finished(sender, **kwargs):
+    Theme.objects.clear_cache()
+request_finished.connect(finished)
