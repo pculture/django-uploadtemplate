@@ -228,6 +228,18 @@ class ViewTestCase(BaseTestCase):
         self.assertTrue(isinstance(response.context['form'],
                                    forms.ThemeUploadForm))
 
+    def test_may_not_delete_bundled_theme(self):
+        """
+        A request to the delete view should refuse to delete a bundled theme.
+        """
+        self.theme.bundled = True
+        self.theme.save()
+
+        c = Client()
+        response = c.get(reverse('uploadtemplate-delete',
+                                 args=[self.theme.pk]))
+        self.assertEquals(response.status_code, 403)
+
     def test_index_GET_no_default(self):
         """
         The GET request to the index should not fail if there's no default

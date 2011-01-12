@@ -47,6 +47,8 @@ def set_default(request, theme_id):
 
 def delete(request, theme_id):
     theme = get_object_or_404(models.Theme, pk=theme_id)
+    if theme.bundled:
+         return HttpResponseForbidden("You may not delete a theme that comes bundled with the site.")
     theme.delete()
     return HttpResponseRedirect(reverse('uploadtemplate-index'))
 
