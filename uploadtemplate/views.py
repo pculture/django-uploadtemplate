@@ -11,13 +11,22 @@ from django.template import RequestContext
 from uploadtemplate import forms
 from uploadtemplate import models
 
+def _is_disabled():
+    # Get the value from settings
+    disable_upload = getattr(settings, 'UPLOADTEMPLATE_DISABLE_UPLOAD', False)
+    # If it is a callable, return its return value.
+    if callable(disable_upload):
+        return disable_upload()
+    # Else, return whatever we got
+    return disable_upload
+
 def index(request):
     """
     If it's a POST request, we try to save the uploaded template.  Otherwise,
     show a list of the currently uploaded templates.
     """
     if request.method == 'POST':
-        if getattr(settings, 'UPLOADTEMPLATE_DISABLE_UPLOAD', False):
+        if _is_disabled():
             return HttpResponseForbidden()
         form = forms.ThemeUploadForm(request.POST, request.FILES)
         if form.is_valid():

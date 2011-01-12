@@ -313,6 +313,47 @@ class ViewTestCase(BaseTestCase):
             settings.UPLOADTEMPLATE_DISABLE_UPLOAD = old_DISABLE_UPLOAD
 
 
+    def test_index_POST_true_callable(self):
+        """
+        If settings.UPLOADTEMPLATE_DISABLE_UPLOAD is a callable that
+        returns True, a POST request should give a 403 Forbidden
+        error.
+        """
+        f = self.theme_zip()
+        f.name = 'theme.zip'
+
+        old_DISABLE_UPLOAD = getattr(settings, 'UPLOADTEMPLATE_DISABLE_UPLOAD',
+                                   False)
+        settings.UPLOADTEMPLATE_DISABLE_UPLOAD = lambda: True
+        try:
+            c = Client()
+            response = c.post(reverse('uploadtemplate-index'),
+                              {'theme': f})
+            self.assertEquals(response.status_code, 403)
+            self.assertEquals(models.Theme.objects.count(), 1)
+        finally:
+            settings.UPLOADTEMPLATE_DISABLE_UPLOAD = old_DISABLE_UPLOAD
+
+    def test_index_POST_false_callable(self):
+        """
+        If settings.UPLOADTEMPLATE_DISABLE_UPLOAD is a callable that
+        returns False, a POST request should work fine (with status 302).
+        """
+        f = self.theme_zip()
+        f.name = 'theme.zip'
+
+        old_DISABLE_UPLOAD = getattr(settings, 'UPLOADTEMPLATE_DISABLE_UPLOAD',
+                                   False)
+        settings.UPLOADTEMPLATE_DISABLE_UPLOAD = lambda: False
+        try:
+            c = Client()
+            response = c.post(reverse('uploadtemplate-index'),
+                              {'theme': f})
+            self.assertEquals(response.status_code, 302)
+            self.assertEquals(models.Theme.objects.count(), 2)
+        finally:
+            settings.UPLOADTEMPLATE_DISABLE_UPLOAD = old_DISABLE_UPLOAD
+
     def test_set_default(self):
         """
         A request to the set_default view should change the default theme.
