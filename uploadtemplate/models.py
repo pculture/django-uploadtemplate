@@ -83,6 +83,7 @@ class Theme(models.Model):
                 pass
             else:
                 raise
+        Theme.objects.clear_cache()
         models.Model.delete(self, *args, **kwargs)
 
     def set_as_default(self):
