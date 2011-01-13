@@ -1,4 +1,7 @@
 def _is_disabled():
+    # Import the current Django settings
+    from django.conf import settings
+
     # Get the value from settings
     disable_upload = getattr(settings, 'UPLOADTEMPLATE_DISABLE_UPLOAD', False)
     # If it is a callable, return its return value.

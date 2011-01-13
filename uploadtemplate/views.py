@@ -11,7 +11,7 @@ from django.template import RequestContext
 from uploadtemplate import forms
 from uploadtemplate import models
 
-from uploadtemplate import is_disabled
+from uploadtemplate import _is_disabled
 
 def index(request):
     """

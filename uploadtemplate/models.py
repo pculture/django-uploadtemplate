@@ -9,7 +9,7 @@ from django.core.signals import request_finished
 from django.db import models
 from django.dispatch import Signal
 
-from uploadtemplate import is_disabled
+from uploadtemplate import _is_disabled
 
 THEME_CACHE = None
 
