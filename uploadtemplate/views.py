@@ -43,10 +43,9 @@ def index(request):
     # Which themes do we offer to the user as choices?
     # Well, surely the ones that are not default.
     available_theme_choices = models.Theme.objects.exclude(default=True)
-    # If custom themes are disabled, then also filter so that we
-    # only show the bundled themes.
-    if _is_disabled():
-        available_theme_choices.filter(bundled=True)
+    # If custom themes are disabled, the template should remove the activate
+    # button so that we don't make users think they can do something they
+    # actually can't.
 
     return render_to_response('uploadtemplate/index.html',
                               {'form': form,
