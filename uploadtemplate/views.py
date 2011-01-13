@@ -11,14 +11,7 @@ from django.template import RequestContext
 from uploadtemplate import forms
 from uploadtemplate import models
 
-def _is_disabled():
-    # Get the value from settings
-    disable_upload = getattr(settings, 'UPLOADTEMPLATE_DISABLE_UPLOAD', False)
-    # If it is a callable, return its return value.
-    if callable(disable_upload):
-        return disable_upload()
-    # Else, return whatever we got
-    return disable_upload
+from uploadtemplate import is_disabled
 
 def index(request):
     """
