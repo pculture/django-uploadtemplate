@@ -50,7 +50,18 @@ def index(request):
                               context_instance=RequestContext(request))
 
 def set_default(request, theme_id):
+    '''This sets a theme as the default.
+    
+    Note that if the module is disabled through a settings option, you will
+    only allowed to be permitted to select a "bundled" theme.'''
     theme = get_object_or_404(models.Theme, pk=theme_id)
+    if theme.bundled:
+        pass # good, everyone can use these
+    else:
+        if _is_disabled(): # check that custom themes are enabled
+            return HttpResponseForbidden()
+
+    # At this point, all authorization and validity checks have succeeded.
     theme.set_as_default()
     return HttpResponseRedirect(reverse('uploadtemplate-index'))
 
