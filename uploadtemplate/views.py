@@ -40,12 +40,19 @@ def index(request):
     except models.Theme.DoesNotExist:
         default = None
 
+    # Which themes do we offer to the user as choices?
+    # Well, surely the ones that are not default.
+    available_theme_choices = models.Theme.objects.exclude(default=True)
+    # If custom themes are disabled, then also filter so that we
+    # only show the bundled themes.
+    if _is_disabled():
+        available_theme_choices.filter(bundled=True)
+
     return render_to_response('uploadtemplate/index.html',
                               {'form': form,
                                'default': default,
                                'themes': models.Theme.objects.all(),
-                               'non_default_themes':
-                                   models.Theme.objects.exclude(default=True),
+                               'non_default_themes': available_theme_choices,
                                },
                               context_instance=RequestContext(request))
 
