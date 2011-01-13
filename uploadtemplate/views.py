@@ -27,7 +27,7 @@ def index(request):
     """
     if request.method == 'POST':
         if _is_disabled():
-            return HttpResponseForbidden()
+            return HttpResponseForbidden("Eek, you may not upload templates.")
         form = forms.ThemeUploadForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
@@ -66,7 +66,7 @@ def set_default(request, theme_id):
         pass # good, everyone can use these
     else:
         if _is_disabled(): # check that custom themes are enabled
-            return HttpResponseForbidden()
+            return HttpResponseForbidden("Eek, you may not set this theme as your current theme.")
 
     # At this point, all authorization and validity checks have succeeded.
     theme.set_as_default()
