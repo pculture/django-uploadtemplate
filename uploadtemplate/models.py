@@ -1,5 +1,6 @@
 from ConfigParser import ConfigParser
 import os.path
+import logging
 import shutil
 from StringIO import StringIO
 import zipfile
@@ -119,11 +120,20 @@ class Theme(models.Model):
         config.set('Theme', 'name', self.name)
         config.set('Theme', 'description', self.description)
         if self.thumbnail:
-            name = os.path.basename(self.thumbnail.name)
-            config.set('Theme', 'thumbnail', name)
-            zip_file.writestr('%s/%s' % (self.name.encode('utf8'),
-                                         name.encode('utf8')),
-                              self.thumbnail.read())
+            try:
+                name = os.path.basename(self.thumbnail.name)
+                thumbnail_data = self.thumbnail.read()
+            except IOError, e:
+                # For some reason, we could not download the thumbnail
+                # data.
+                logging.error(e)
+                logging.error("We failed to grab a theme thumbnail.")
+            else:
+                # If we successfully got the thumbnail, add it to the zip.
+                config.set('Theme', 'thumbnail', name)
+                zip_file.writestr('%s/%s' % (self.name.encode('utf8'),
+                                             name.encode('utf8')),
+                                  thumbnail_data)
 
         meta_ini = StringIO()
         config.write(meta_ini)
