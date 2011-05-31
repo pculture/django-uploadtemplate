@@ -3,6 +3,7 @@ from ConfigParser import ConfigParser
 import os.path
 from StringIO import StringIO
 import zipfile
+import hashlib
 
 from django.contrib.sites.models import Site
 from django.core.files.base import ContentFile
@@ -62,9 +63,26 @@ class ThemeUploadForm(forms.Form):
         if config.has_option('Theme', 'thumbnail'):
             path = config.get('Theme', 'thumbnail')
             name, ext = os.path.splitext(path)
-            theme.thumbnail.save(theme.name + ext,
-                                 ContentFile(zip_file.read(
-                        os.path.join(prefix, path))))
+            # Sometimes, thumbnail names get too long.
+            # At that point, just shorten them a hash of their content,
+            # plus the extension. We use a hash of their content here
+            # to avoid accidentally overwriting other files just because
+            # two files happen to share a name.
+            thumbnail_filename = theme.name + ext
+            thumbnail_content = zip_file.read(
+                        os.path.join(prefix, path))
+
+            if len(thumbnail_filename) >= theme.thumbnail.field.max_length:
+                # Uh oh, the filename will be too long for us to store in
+                # the database. In that case, let's use the hash of the
+                # file content.
+                digest = hashlib.sha1(thumbnail_content).hexdigest()
+                thumbnail_filename = 'img-' + digest + ext
+                assert (len(thumbnail_filename) <
+                        theme.thumbnail.field.max_length)
+
+            theme.thumbnail.save(thumbnail_filename,
+                                 ContentFile(thumbnail_content))
 
         static_root = theme.static_root()
         template_dir = theme.template_dir()
