@@ -3,7 +3,7 @@ import urlparse
 from django.conf import settings
 from django import template
 
-from uploadtemplate import models
+from uploadtemplate.models import Theme
 
 register = template.Library()
 
@@ -13,17 +13,19 @@ class ThemeStaticUrlNode(template.Node):
 
     def render(self, context):
         if 'uploadtemplate_theme' in context:
-            theme = context['uploadtemplate_theme']
-            base = theme.static_url()
+            theme = context['uploadtemplate_current_theme']
         else:
             try:
-                theme = models.Theme.objects.get_default()
-            except models.Theme.DoesNotExist:
+                theme = Theme.objects.get_default()
+            except Theme.DoesNotExist:
                 theme = None
-                base = settings.STATIC_URL
-            else:
-                context['uploadtemplate_theme'] = theme
-                base = theme.static_url()
+            context['uploadtemplate_current_theme'] = theme
+
+        if theme is None:
+            base = settings.STATIC_URL
+        else:
+            base = theme.static_url()
+
         path = self.path.resolve(context)
         if path.startswith('/') and not (theme and theme.bundled):
             path = path[1:]
