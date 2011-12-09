@@ -20,7 +20,7 @@ class ThemeStaticUrlNode(template.Node):
                 theme = models.Theme.objects.get_default()
             except models.Theme.DoesNotExist:
                 theme = None
-                base = settings.MEDIA_URL
+                base = settings.STATIC_URL
             else:
                 context['uploadtemplate_theme'] = theme
                 base = theme.static_url()

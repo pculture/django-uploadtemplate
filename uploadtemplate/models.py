@@ -101,13 +101,13 @@ class Theme(models.Model):
         Theme.objects.set_default(self)
 
     def static_root(self):
-        return '%s/static/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT, self.pk)
+        return '%sstatic/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT, self.pk)
 
     def static_url(self):
-        return '%s/static/%i/' % (settings.UPLOADTEMPLATE_MEDIA_URL, self.pk)
+        return '%sstatic/%i/' % (settings.UPLOADTEMPLATE_MEDIA_URL, self.pk)
 
     def template_dir(self):
-        return '%s/templates/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT,
+        return '%stemplates/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT,
                                      self.pk)
 
     def zip_file(self, file_object):
