@@ -52,8 +52,9 @@ class Theme(models.Model):
 
     site = models.ForeignKey('sites.Site')
     name = models.CharField(max_length=255)
-    thumbnail = models.ImageField(upload_to='uploadtemplate/theme_thumbnails',
-                                  blank=True)
+    thumbnail = models.ImageField(
+                        upload_to='uploadtemplate/theme_thumbnails/%Y/%m/%d',
+                        blank=True)
     description = models.TextField()
     default = models.BooleanField(default=False)
 

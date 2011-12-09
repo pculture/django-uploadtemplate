@@ -1,4 +1,5 @@
 from __future__ import with_statement
+import datetime
 import os.path
 import shutil
 from StringIO import StringIO
@@ -133,7 +134,8 @@ class ThemeUploadFormTestCase(BaseTestCase):
                           'This is the description of the test theme.')
         self.assertEquals(
             theme.thumbnail.name,
-            'uploadtemplate/theme_thumbnails/UploadTemplate_Test_Theme.gif')
+            ('uploadtemplate/theme_thumbnails/%s/UploadTemplate_Test_Theme.gif'
+             % datetime.date.today().strftime('%Y/%m/%d')))
         self.assertTrue(theme.static_root().startswith(
                 settings.UPLOADTEMPLATE_MEDIA_ROOT))
         self.assertTrue(theme.template_dir().startswith(
@@ -173,7 +175,8 @@ class ThemeUploadFormTestCase(BaseTestCase):
                           'This is the description of the test theme.')
         self.assertEquals(
             theme.thumbnail.name,
-            'uploadtemplate/theme_thumbnails/UploadTemplate_Test_Theme.gif')
+            ('uploadtemplate/theme_thumbnails/%s/UploadTemplate_Test_Theme.gif'
+             % datetime.date.today().strftime("%Y/%m/%d")))
         self.assertTrue(theme.static_root().startswith(
                 settings.UPLOADTEMPLATE_MEDIA_ROOT))
         self.assertTrue(theme.template_dir().startswith(
@@ -394,7 +397,6 @@ class ViewTestCase(BaseTestCase):
                 reverse('uploadtemplate-index')))
 
         self.assertEquals(models.Theme.objects.count(), 0)
-        self.assertFalse(os.path.exists(thumbnail_file))
         self.assertFalse(os.path.exists(static_root))
         self.assertFalse(os.path.exists(template_dir))
 
