@@ -23,13 +23,13 @@ class ThemeStaticUrlNode(template.Node):
             context['uploadtemplate_current_theme'] = theme
 
         path = self.path.resolve(context)
-        if path.startswith('/'): # use_bundled = True and not (theme and theme.bundled):
+        if path.startswith('/'):
             path = path[1:]
             use_bundled = True
         else:
             use_bundled = self.use_bundled
 
-        if theme is None or use_bundled:
+        if theme is None or (use_bundled and theme and theme.bundled):
             base = settings.STATIC_URL
         else:
             base = theme.static_url()
