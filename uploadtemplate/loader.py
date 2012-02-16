@@ -18,8 +18,8 @@ class Loader(filesystem.Loader):
 _loader = Loader()
 
 def load_template_source(template_name, dirs=None):
-    import warning
-    warning.warn("`uploadtemplate.loader.load_template_source` is deprecated. "
+    import warnings
+    warnings.warn("`uploadtemplate.loader.load_template_source` is deprecated. "
                  "Use `uploadtempalte.loader.Loader` instead.",
                  DeprecationWarning)
     return _loader.load_template_source(template_name, dirs)
