@@ -44,8 +44,8 @@ class BaseTestCase(TestCase):
         settings.UPLOADTEMPLATE_MEDIA_ROOT = settings.MEDIA_ROOT = self.tmpdir
         settings.TEMPLATE_CONTEXT_PROCESSORS = []
         settings.TEMPLATE_LOADERS = [
-            #'uploadtemplate.loader.load_template_source',
-            'django.template.loaders.filesystem.load_template_source']
+            'uploadtemplate.loader.Loader',
+            'django.template.loaders.filesystem.Loader']
         settings.TEMPLATE_DIRS = [
             os.path.join(os.path.dirname(__file__), 'testdata', 'templates')]
         models.Theme.__dict__['thumbnail'].field.storage = \
@@ -223,7 +223,8 @@ class ViewTestCase(BaseTestCase):
         c = Client()
         response = c.get(reverse('uploadtemplate-index'))
         self.assertEquals(response.status_code, 200)
-        self.assertEquals(response.template.name, 'uploadtemplate/index.html')
+        self.assertEquals(response.templates[0].name,
+                          'uploadtemplate/index.html')
         self.assertEquals(response.context['default'], self.theme)
         self.assertEquals(list(response.context['themes']),
                           [self.theme])
@@ -253,7 +254,8 @@ class ViewTestCase(BaseTestCase):
         c = Client()
         response = c.get(reverse('uploadtemplate-index'))
         self.assertTrue(response.status_code, 200)
-        self.assertEquals(response.template.name, 'uploadtemplate/index.html')
+        self.assertEquals(response.templates[0].name,
+                          'uploadtemplate/index.html')
         self.assertEquals(response.context['default'], None)
         self.assertEquals(list(response.context['themes']), [])
         self.assertEquals(list(response.context['non_default_themes']), [])
@@ -268,7 +270,8 @@ class ViewTestCase(BaseTestCase):
         c = Client()
         response = c.post(reverse('uploadtemplate-index'))
         self.assertEquals(response.status_code, 200)
-        self.assertEquals(response.template.name, 'uploadtemplate/index.html')
+        self.assertEquals(response.templates[0].name,
+                          'uploadtemplate/index.html')
         self.assertEquals(response.context['default'], self.theme)
         self.assertTrue(response.context['form'].is_bound)
         self.assertFalse(response.context['form'].is_valid())
