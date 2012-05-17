@@ -48,9 +48,16 @@ def index(request):
                                },
                               context_instance=RequestContext(request))
 
+def unset_default(request):
+    '''
+    This removes any them as set, to fall back to the default templates.
+    '''
+    models.Theme.objects.set_default(None)
+    return HttpResponseRedirect(reverse('uploadtemplate-index'))
+
 def set_default(request, theme_id):
     '''This sets a theme as the default.
-    
+
     Note that if the module is disabled through a settings option, you will
     only allowed to be permitted to select a "bundled" theme.'''
     theme = get_object_or_404(models.Theme, pk=theme_id)

@@ -14,6 +14,8 @@ from uploadtemplate import _is_disabled
 
 THEME_CACHE = None
 
+NO_THEME = object()
+
 class ThemeManager(models.Manager):
 
     def create_theme(self, *args, **kwargs):
@@ -34,14 +36,23 @@ class ThemeManager(models.Manager):
             theme.default = False
             theme.save()
 
-        obj.default = True
-        obj.save()
+        if obj is not None and obj is not NO_THEME:
+            obj.default = True
+            obj.save()
+        else:
+            obj = NO_THEME
+
         THEME_CACHE = obj
 
     def get_default(self):
         global THEME_CACHE
         if THEME_CACHE is None:
-            THEME_CACHE = self.get(default=True)
+            try:
+                THEME_CACHE = self.get(default=True)
+            except self.model.DoesNotExist:
+                THEME_CACHE = NO_THEME
+        if THEME_CACHE is NO_THEME:
+            raise self.model.DoesNotExist
         return THEME_CACHE
 
     def clear_cache(self):

@@ -382,12 +382,29 @@ class ViewTestCase(BaseTestCase):
         theme = models.Theme.objects.get_default()
         self.assertEquals(theme, self.theme)
 
+    def test_unset_default(self):
+        """
+        A request to the unset_default should unset all themes as the default.
+        """
+        self.assertEquals(models.Theme.objects.get_default(), self.theme)
+
+        c = Client()
+        response = c.get(reverse('uploadtemplate-unset_default'))
+        self.assertEquals(response.status_code, 302)
+        self.assertEquals(response['Location'],
+                          'http://testserver%s' % (
+                reverse('uploadtemplate-index')))
+
+        self.assertRaises(models.Theme.DoesNotExist,
+                          models.Theme.objects.get_default)
+        # didn't just delete the theme
+        self.assertTrue(models.Theme.objects.filter(pk=self.theme.pk).exists())
+
     def test_delete(self):
         """
         A request to the delete view should remove the theme and all its files,
         then redirect back to the index.
         """
-        thumbnail_file = self.theme.thumbnail.path
         static_root = self.theme.static_root()
         template_dir = self.theme.template_dir()
 
