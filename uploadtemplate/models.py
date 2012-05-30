@@ -10,8 +10,6 @@ from django.core.signals import request_finished
 from django.db import models
 from django.dispatch import Signal
 
-from uploadtemplate import _is_disabled
-
 THEME_CACHE = None
 
 NO_THEME = object()
@@ -100,14 +98,6 @@ class Theme(models.Model):
                 raise
         Theme.objects.clear_cache()
         models.Model.delete(self, *args, **kwargs)
-
-    def may_set_as_default(self):
-        if self.bundled:
-            return True # you may always choose a bundled theme
-        else:
-            if _is_disabled(): # Sorry! When the system is disabled
-                return False   # you may only choose a bundled theme.
-            return True
 
     def set_as_default(self):
         Theme.objects.set_default(self)
