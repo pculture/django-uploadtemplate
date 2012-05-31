@@ -38,6 +38,8 @@ class AdminView(FormView):
         return super(AdminView, self).form_valid(form)
 
 
+index = AdminView.as_view() # backwards compatibility
+
 def unset_default(request):
     '''
     This removes any them as set, to fall back to the default templates.
