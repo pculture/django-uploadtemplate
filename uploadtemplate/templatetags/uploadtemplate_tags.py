@@ -1,7 +1,7 @@
 import urlparse
 
-from django.conf import settings
 from django import template
+from django.conf import settings
 
 from uploadtemplate.models import Theme
 
@@ -30,6 +30,10 @@ class ThemeStaticUrlNode(template.Node):
             use_bundled = self.use_bundled
 
         if theme is None or (use_bundled and theme and theme.bundled):
+            if 'django.contrib.staticfiles' in settings.INSTALLED_APPS:
+                from django.contrib.staticfiles.storage import staticfiles_storage
+                return staticfiles_storage.url(path)
+
             base = settings.STATIC_URL
         else:
             base = theme.static_url()
