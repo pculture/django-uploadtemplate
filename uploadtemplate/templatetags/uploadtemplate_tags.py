@@ -1,16 +1,18 @@
+import os
 import urlparse
+import warnings
 
 from django import template
 from django.conf import settings
+from django.core.files.storage import default_storage
 
 from uploadtemplate.models import Theme
 
 register = template.Library()
 
 class ThemeStaticUrlNode(template.Node):
-    def __init__(self, path, use_bundled):
+    def __init__(self, path):
         self.path = path
-        self.use_bundled = use_bundled
 
     def render(self, context):
         if 'uploadtemplate_theme' in context:
@@ -25,31 +27,26 @@ class ThemeStaticUrlNode(template.Node):
         path = self.path.resolve(context)
         if path.startswith('/'):
             path = path[1:]
-            use_bundled = True
-        else:
-            use_bundled = self.use_bundled
 
-        if theme is None or (use_bundled and theme and theme.bundled):
+        if (theme is not None and
+            os.path.exists(os.path.join(theme.static_root(), path))):
+            base = theme.static_url()
+        else:
             if 'django.contrib.staticfiles' in settings.INSTALLED_APPS:
                 from django.contrib.staticfiles.storage import staticfiles_storage
                 return staticfiles_storage.url(path)
 
             base = settings.STATIC_URL
-        else:
-            base = theme.static_url()
 
         return urlparse.urljoin(base, path)
 
 @register.tag
 def get_static_url(parser, token):
-    tokens = token.split_contents()
-    if len(tokens) not in (2, 3):
-        raise template.TemplateSyntaxError('%s takes 1 or 2 arguments' % tokens[0])
-    use_bundled = False
-    if len(tokens) == 3:
-        if tokens[2] == 'bundled':
-            use_bundled = True
-        else:
-            raise template.TemplateSyntaxError('%s 3rd argument must be "bundled", not %r' % (tokens[0], tokens[2]))
-    return ThemeStaticUrlNode(template.Variable(tokens[1]),
-                              use_bundled)
+    bits = token.split_contents()
+    if len(bits) == 3:
+        warnings.warn("get_static_url no longer takes a `bundled` kwarg",
+                      DeprecationWarning)
+    elif len(bits) != 2:
+        raise template.TemplateSyntaxError('%s takes 1 arguments' % tokens[0])
+
+    return ThemeStaticUrlNode(parser.compile_filter(bits[1]))
