@@ -9,4 +9,3 @@ setup(name="django-uploadtemplate",
       packages=find_packages()
       )
 
-
