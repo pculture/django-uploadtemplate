@@ -15,7 +15,6 @@ THEME_CACHE = None
 NO_THEME = object()
 
 class ThemeManager(models.Manager):
-
     def create_theme(self, *args, **kwargs):
         if 'name' in kwargs:
             name = original_name = kwargs['name']
@@ -66,8 +65,6 @@ class Theme(models.Model):
                         blank=True)
     description = models.TextField()
     default = models.BooleanField(default=False)
-
-    bundled = models.BooleanField(default=False)
 
     objects = ThemeManager()
 
