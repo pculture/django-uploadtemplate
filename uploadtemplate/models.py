@@ -57,11 +57,12 @@ class ThemeManager(models.Manager):
         THEME_CACHE = None
 
 class Theme(models.Model):
-
     site = models.ForeignKey('sites.Site')
     name = models.CharField(max_length=255)
+    theme_files_zip = models.FileField(upload_to='uploadtemplate/files/%Y/%m/%d',
+                                       blank=True)
     thumbnail = models.ImageField(
-                        upload_to='uploadtemplate/theme_thumbnails/%Y/%m/%d',
+                        upload_to='uploadtemplate/thumbnails/%Y/%m/%d',
                         blank=True)
     description = models.TextField(blank=True)
     default = models.BooleanField(default=False)

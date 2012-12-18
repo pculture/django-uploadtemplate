@@ -28,17 +28,21 @@ class ThemeStaticUrlNode(template.Node):
         if path.startswith('/'):
             path = path[1:]
 
-        if (theme is not None and
-            os.path.exists(os.path.join(theme.static_root(), path))):
-            base = theme.static_url()
-        else:
-            if 'django.contrib.staticfiles' in settings.INSTALLED_APPS:
-                from django.contrib.staticfiles.storage import staticfiles_storage
-                return staticfiles_storage.url(path)
+        if theme is not None:
+            # Try the new location first.
+            base_dir = 'uploadtemplate/themes/{pk}/static'.format(pk=theme.pk)
+            name = os.path.join(base_dir, path)
+            if default_storage.exists(name):
+                return default_storage.url(name)
 
-            base = settings.STATIC_URL
+            if os.path.exists(os.path.join(theme.static_root(), path)):
+                return urlparse.urljoin(base, path)
 
-        return urlparse.urljoin(base, path)
+        if 'django.contrib.staticfiles' in settings.INSTALLED_APPS:
+            from django.contrib.staticfiles.storage import staticfiles_storage
+            return staticfiles_storage.url(path)
+
+        return urlparse.urljoin(settings.STATIC_URL, path)
 
 @register.tag
 def get_static_url(parser, token):
