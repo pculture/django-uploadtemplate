@@ -63,7 +63,7 @@ class Theme(models.Model):
     thumbnail = models.ImageField(
                         upload_to='uploadtemplate/theme_thumbnails/%Y/%m/%d',
                         blank=True)
-    description = models.TextField()
+    description = models.TextField(blank=True)
     default = models.BooleanField(default=False)
 
     objects = ThemeManager()
