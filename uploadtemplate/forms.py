@@ -1,112 +1,95 @@
-from __future__ import with_statement
-from ConfigParser import ConfigParser
-import os.path
+import os
 from StringIO import StringIO
 import zipfile
-import hashlib
 
 from django.contrib.sites.models import Site
 from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django import forms
 
-from uploadtemplate import models
+from uploadtemplate.models import Theme
 
-def _zip_prefix(zip_file):
-    meta_files = [name for name in zip_file.namelist()
-                      if os.path.split(name)[1] == 'meta.ini']
-    if not meta_files:
-        return None
-    return os.path.split(meta_files[0])[0]
 
-class ThemeUploadForm(forms.Form):
+class ThemeForm(forms.ModelForm):
+    class Meta:
+        model = Theme
+        exclude = ('site',)
 
-    theme = forms.FileField(label="Theme ZIP")
-
-    def clean_theme(self):
-        value = self.cleaned_data.get('theme')
+    def clean_theme_files_zip(self):
+        value = self.cleaned_data.get('theme_files_zip')
         if not value:
             return value
 
         try:
             zip_file = zipfile.ZipFile(value)
         except zipfile.error:
-            raise forms.ValidationError('Uploaded theme is not a ZIP file')
+            raise forms.ValidationError('Must be a valid zip archive.')
 
-        if _zip_prefix(zip_file) is None:
-            raise forms.ValidationError(
-                'Uploaded theme is invalid: missing meta.ini file')
+        names = zip_file.namelist()
+        if not names:
+            raise forms.ValidationError('Zip archive cannot be empty.')
 
-        return zip_file
+        root_dirs = set()
+        for n in names:
+            if n.startswith('/') or '..' in n.split('/'):
+                raise forms.ValidationError('Zip archive contains invalid names.')
 
-    def save(self):
+            if '/' not in n:
+                raise forms.ValidationError('Zip archive cannot contain files in its root.')
+
+            root_dirs.add(n.split('/', 1)[0])
+
+        if len(root_dirs) > 1:
+            raise forms.ValidationError('Zip archive must contain a single directory at its root.')
+
+        self._zip_file = zip_file
+        self._zip_file_root = list(root_dirs)[0]
+
+        return value
+
+    def save(self, commit=True):
         if not self.is_valid():
             raise ValueError("Cannot save an invalid upload.")
 
-        zip_file = self.cleaned_data['theme']
+        self.instance.site = Site.objects.get_current()
+        instance = super(ThemeForm, self).save(commit=False)
 
-        prefix = _zip_prefix(zip_file)
+        old_save_m2m = self.save_m2m
 
-        meta_file = StringIO(zip_file.read(
-                os.path.join(prefix, 'meta.ini')))
+        def save_m2m():
+            old_save_m2m()
+            base_dir = 'uploadtemplate/themes/{pk}/'.format(pk=instance.pk)
 
-        config = ConfigParser()
-        config.readfp(meta_file, 'meta.ini')
+            names = set()
 
-        theme = models.Theme.objects.create_theme(
-            site = Site.objects.get_current(),
-            name = config.get('Theme', 'name'))
+            # First unzip and replace any files.
+            for filename in self._zip_file.namelist():
+                output_path = filename[(len(self._zip_file_root) + 1):]
+                name = os.path.join(base_dir, output_path)
+                sio = StringIO()
+                sio.write(self._zip_file.read(filename))
+                fp = ContentFile(sio)
+                if default_storage.exists(name):
+                    default_storage.delete(name)
+                default_storage.save(name, fp)
+                names.add(name)
 
-        if config.has_option('Theme', 'description'):
-            theme.description = config.get('Theme', 'description')
-            theme.save()
+            # Then recursively delete any files that don't belong.
+            def check_dir(root_dir):
+                directories, files = default_storage.listdir(root_dir)
+                for filename in files:
+                    path = os.path.join(root_dir, filename)
+                    if path not in names:
+                        default_storage.delete(path)
+                for dirname in directories:
+                    path = os.path.join(root_dir, dirname)
+                    check_dir(path)
+            check_dir(base_dir)
 
-        if config.has_option('Theme', 'thumbnail'):
-            path = config.get('Theme', 'thumbnail')
-            name, ext = os.path.splitext(path)
-            # Sometimes, thumbnail names get too long.
-            # At that point, just shorten them a hash of their content,
-            # plus the extension. We use a hash of their content here
-            # to avoid accidentally overwriting other files just because
-            # two files happen to share a name.
-            thumbnail_filename = theme.name + ext
-            thumbnail_content = zip_file.read(
-                        os.path.join(prefix, path))
+        if commit:
+            instance.save()
+            save_m2m()
+        else:
+            self.save_m2m = save_m2m
 
-            if len(thumbnail_filename) >= theme.thumbnail.field.max_length:
-                # Uh oh, the filename will be too long for us to store in
-                # the database. In that case, let's use the hash of the
-                # file content.
-                digest = hashlib.sha1(thumbnail_content).hexdigest()
-                thumbnail_filename = 'img-' + digest + ext
-                assert (len(thumbnail_filename) <
-                        theme.thumbnail.field.max_length)
-
-            theme.thumbnail.save(thumbnail_filename,
-                                 ContentFile(thumbnail_content))
-
-        static_root = theme.static_root()
-        template_dir = theme.template_dir()
-
-        for filename in zip_file.namelist():
-            if prefix and not filename.startswith(prefix):
-                continue
-            dirname, basename = os.path.split(filename)
-            if prefix:
-                dirname = dirname[len(prefix)+1:]
-            output_path = None
-            if dirname.startswith('static'):
-                dirname = dirname[len('static/'):]
-                if not os.path.exists(os.path.join(static_root, dirname)):
-                    os.makedirs(os.path.join(static_root, dirname))
-                output_path = os.path.join(static_root, dirname,
-                                           basename)
-            elif dirname.startswith('templates'):
-                dirname = dirname[len('templates/'):]
-                if not os.path.exists(os.path.join(template_dir, dirname)):
-                    os.makedirs(os.path.join(template_dir, dirname))
-                output_path = os.path.join(template_dir, dirname, basename)
-            if output_path is not None and not os.path.exists(output_path):
-                with file(output_path, 'wb') as output_file:
-                    output_file.write(zip_file.read(filename))
-
-        return theme
+        return instance

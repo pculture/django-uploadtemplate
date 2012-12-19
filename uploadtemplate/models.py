@@ -6,55 +6,58 @@ from StringIO import StringIO
 import zipfile
 
 from django.conf import settings
+from django.contrib.sites.models import Site
 from django.core.signals import request_finished
 from django.db import models
 from django.dispatch import Signal
 
-THEME_CACHE = None
-
-NO_THEME = object()
 
 class ThemeManager(models.Manager):
-    def create_theme(self, *args, **kwargs):
-        if 'name' in kwargs:
-            name = original_name = kwargs['name']
-            c = 1
-            while self.filter(name=name):
-                c += 1
-                name = '%s %s' % (original_name, c)
-            kwargs['name'] = name
-        obj = self.create(*args, **kwargs)
-        self.set_default(obj)
-        return obj
+    def __init__(self):
+        super(ThemeManager, self).__init__()
+        self._cache = {}
 
-    def set_default(self, obj):
-        global THEME_CACHE
-        for theme in self.filter(default=True):
-            theme.default = False
-            theme.save()
-
-        if obj is not None and obj is not NO_THEME:
-            obj.default = True
-            obj.save()
-        else:
-            obj = NO_THEME
-
-        THEME_CACHE = obj
-
-    def get_default(self):
-        global THEME_CACHE
-        if THEME_CACHE is None:
+    def get_cached(self, site, using):
+        if isinstance(site, Site):
+            site = site.pk
+        site_pk = int(site)
+        if (using, site_pk) not in self._cache:
             try:
-                THEME_CACHE = self.get(default=True)
+                theme = self.get(site=site_pk, default=True)
             except self.model.DoesNotExist:
-                THEME_CACHE = NO_THEME
-        if THEME_CACHE is NO_THEME:
+                theme = None
+            self._cache[(using, site_pk)] = theme
+        theme = self._cache[(using, site_pk)]
+        if theme is None:
             raise self.model.DoesNotExist
-        return THEME_CACHE
+        return theme
+
+    def get_current(self):
+        """
+        Shortcut for getting the currently-active instance from the cache.
+
+        """
+        site = settings.SITE_ID
+        using = self._db if self._db is not None else 'default'
+        return self.get_cached(site, using)
 
     def clear_cache(self):
-        global THEME_CACHE
-        THEME_CACHE = None
+        self._cache = {}
+
+    def _post_save(self, sender, instance, created, raw, using, **kwargs):
+        if instance.default:
+            self._cache[(using, instance.site_id)] = instance
+        elif self._cache[(using, instance.site_id)] == instance:
+            self._cache[(using, instance.site_id)] = None
+
+    def contribute_to_class(self, model, name):
+        # In addition to the normal contributions, we also attach a post-save
+        # listener to cache newly-saved instances immediately. This is
+        # post-save to make sure that we don't cache anything invalid.
+        super(ThemeManager, self).contribute_to_class(model, name)
+        if not model._meta.abstract:
+            models.signals.post_save.connect(self._post_save, sender=model)
+
 
 class Theme(models.Model):
     site = models.ForeignKey('sites.Site')
@@ -96,9 +99,6 @@ class Theme(models.Model):
                 raise
         Theme.objects.clear_cache()
         models.Model.delete(self, *args, **kwargs)
-
-    def set_as_default(self):
-        Theme.objects.set_default(self)
 
     def static_root(self):
         return '%sstatic/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT, self.pk)

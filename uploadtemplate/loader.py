@@ -9,7 +9,7 @@ from uploadtemplate import models
 class Loader(filesystem.Loader):
     def load_template_source(self, template_name, dirs=None):
         try:
-            theme = models.Theme.objects.get_default()
+            theme = models.Theme.objects.get_current()
         except models.Theme.DoesNotExist:
             raise TemplateDoesNotExist, 'no default theme'
 

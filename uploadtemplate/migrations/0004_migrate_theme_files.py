@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-import datetime
-import shutil
 import os
 from StringIO import StringIO
 import zipfile
@@ -52,7 +50,8 @@ class Migration(DataMigration):
                 zip_file.close()
 
             sio.seek(0)
-            theme.theme_files_zip = ContentFile(sio.read(), name='theme.zip')
+            name = theme._meta.get_field('theme_files_zip').generate_filename(theme, 'theme.zip')
+            theme.theme_files_zip = ContentFile(sio.read(), name=name)
             theme.save()
 
     def backwards(self, orm):

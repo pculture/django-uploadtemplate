@@ -19,7 +19,7 @@ class ThemeStaticUrlNode(template.Node):
             theme = context['uploadtemplate_current_theme']
         else:
             try:
-                theme = Theme.objects.get_default()
+                theme = Theme.objects.get_current()
             except Theme.DoesNotExist:
                 theme = None
             context['uploadtemplate_current_theme'] = theme

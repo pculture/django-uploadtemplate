@@ -1,57 +1,75 @@
-from __future__ import with_statement
-from StringIO import StringIO
-
 from django.conf import settings
-from django.core.urlresolvers import reverse
-from django.http import HttpResponse, HttpResponseRedirect
-from django.http import HttpResponseForbidden
-from django.shortcuts import render_to_response, get_object_or_404
-from django.template import RequestContext
-from django.views.generic import FormView
+from django.core.urlresolvers import reverse, reverse_lazy
+from django.http import HttpResponseRedirect, Http404
+from django.shortcuts import get_object_or_404
+from django.views.generic import ListView, CreateView, UpdateView
 
-from uploadtemplate.forms import ThemeUploadForm
+from uploadtemplate.forms import ThemeForm
 from uploadtemplate.models import Theme
 
 
-class AdminView(FormView):
-    form_class = ThemeUploadForm
-    template_name = 'uploadtemplate/index.html'
+class ThemeCreateView(CreateView):
+    form_class = ThemeForm
+    template_name = 'uploadtemplate/theme_edit.html'
+    success_url = reverse_lazy('uploadtemplate-index')
+    context_object_name = 'theme'
+    initial = {'default': True}
 
-    def get_success_url(self):
-        return self.request.path
+    def get_queryset(self):
+        return Theme.objects.filter(site=settings.SITE_ID)
+
+
+class ThemeUpdateView(UpdateView):
+    form_class = ThemeForm
+    template_name = 'uploadtemplate/theme_edit.html'
+    success_url = reverse_lazy('uploadtemplate-index')
+    context_object_name = 'theme'
+
+    def get_queryset(self):
+        return Theme.objects.filter(site=settings.SITE_ID)
+
+
+class ThemeIndexView(ListView):
+    template_name = 'uploadtemplate/theme_index.html'
+    context_object_name = 'themes'
+
+    def get_queryset(self):
+        return Theme.objects.filter(site=settings.SITE_ID)
 
     def get_context_data(self, **kwargs):
-        context = super(AdminView, self).get_context_data(**kwargs)
+        context = super(ThemeIndexView, self).get_context_data(**kwargs)
         try:
-            default = Theme.objects.get_default()
+            current = Theme.objects.get_current()
         except Theme.DoesNotExist:
-            default = None
+            current = None
 
         context.update({
-            'default': default,
-            'themes': Theme.objects.all(),
+            'current': current,
+            # Backwards-compat
+            'default': current,
         })
         return context
 
-    def form_valid(self, form):
-        form.save()
-        return super(AdminView, self).form_valid(form)
 
+index = ThemeIndexView.as_view() # backwards compatibility
 
-index = AdminView.as_view() # backwards compatibility
 
 def unset_default(request):
     '''
     This removes any them as set, to fall back to the default templates.
     '''
-    Theme.objects.set_default(None)
+    Theme.objects.filter(site=settings.SITE_ID, default=True).update(default=False)
+    Theme.objects.clear_cache()
     return HttpResponseRedirect(reverse('uploadtemplate-index'))
 
 
 def set_default(request, theme_id):
     """Sets a theme as the default."""
     theme = get_object_or_404(Theme, pk=theme_id)
-    theme.set_as_default()
+    if not theme.default:
+        Theme.objects.filter(site=settings.SITE_ID, default=True).update(default=False)
+        theme.default = True
+        theme.save()
     return HttpResponseRedirect(reverse('uploadtemplate-index'))
 
 
@@ -62,11 +80,4 @@ def delete(request, theme_id):
 
 
 def download(request, theme_id):
-    theme = get_object_or_404(Theme, pk=theme_id)
-    sio = StringIO()
-    theme.zip_file(sio)
-    sio.seek(0)
-    response = HttpResponse(sio, content_type='application/zip')
-    response['Content-Disposition'] = 'attachment; filename="%s.zip"' % (
-        theme.name,)
-    return response
+    raise Http404
