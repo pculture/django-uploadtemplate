@@ -45,7 +45,8 @@ class ThemeManager(models.Manager):
     def _post_save(self, sender, instance, created, raw, using, **kwargs):
         if instance.default:
             self._cache[(using, instance.site_id)] = instance
-        elif self._cache[(using, instance.site_id)] == instance:
+        elif ((using, instance.site_id) in self._cache and
+              self._cache[(using, instance.site_id)] == instance):
             self._cache[(using, instance.site_id)] = None
 
     def contribute_to_class(self, model, name):
