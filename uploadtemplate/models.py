@@ -1,15 +1,14 @@
-from ConfigParser import ConfigParser
-import os.path
-import logging
+import os
 import shutil
 from StringIO import StringIO
 import zipfile
 
 from django.conf import settings
 from django.contrib.sites.models import Site
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.signals import request_finished
 from django.db import models
-from django.dispatch import Signal
 
 
 class ThemeManager(models.Manager):
@@ -82,7 +81,64 @@ class Theme(models.Model):
     def get_absolute_url(self):
         return ['uploadtemplate-set_default', (self.pk,)]
 
+    @property
+    def theme_files_dir(self):
+        if self.pk is None:
+            raise AttributeError("Themes with no pk have no theme files directory.")
+        return 'uploadtemplate/themes/{pk}/'.format(pk=self.pk)
+
+    def save_files(self):
+        zip_file = zipfile.ZipFile(self.theme_files_zip)
+
+        # Unzip and replace any files.
+        for filename in zip_file.namelist():
+            # skip any zipped directories.
+            if filename.endswith('/'):
+                continue
+            name = os.path.join(self.theme_files_dir, filename)
+            sio = StringIO()
+            sio.write(zip_file.read(filename))
+            fp = ContentFile(sio.read())
+            if default_storage.exists(name):
+                default_storage.delete(name)
+            default_storage.save(name, fp)
+
+    def list_files(self, root_dir=None):
+        if root_dir is None:
+            root_dir = self.theme_files_dir
+        directories, filenames = default_storage.listdir(root_dir)
+        files = [os.path.join(root_dir, name) for name in filenames]
+        for dirname in directories:
+            files.extend(self.list_files(os.path.join(root_dir, dirname)))
+        return files
+
+    def prune_files(self):
+        """
+        Removes files from the theme's directory that aren't in the theme's
+        zipfile.
+
+        """
+        zip_file = zipfile.ZipFile(self.theme_files_zip)
+
+        expected_files = set((os.path.join(self.theme_files_dir, name)
+                              for name in zip_file.namelist()))
+        found_files = set(self.list_files())
+
+        to_prune = found_files - expected_files
+        for name in to_prune:
+            default_storage.delete(name)
+
+    def delete_files(self):
+        """
+        Removes all files from the theme's directory.
+
+        """
+        for name in self.list_files():
+            default_storage.delete(name)
+
     def delete(self, *args, **kwargs):
+        self.delete_files()
+        # Backwards-compat: Try to delete the old directories too.
         try:
             shutil.rmtree(self.static_root())
         except OSError, e:
@@ -97,81 +153,21 @@ class Theme(models.Model):
                 pass
             else:
                 raise
-        Theme.objects.clear_cache()
-        models.Model.delete(self, *args, **kwargs)
+        Theme.objects._post_save(None, self, None, None, using=self._state.db)
+        super(Theme, self).delete(self, *args, **kwargs)
 
+    # Required for backwards-compatibility shims for get_static_url.
     def static_root(self):
         return '%sstatic/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT, self.pk)
 
+    # Required for backwards-compatibility shims for get_static_url.
     def static_url(self):
         return '%sstatic/%i/' % (settings.UPLOADTEMPLATE_MEDIA_URL, self.pk)
 
+    # Required for backwards-compatibility shims for template loader.
     def template_dir(self):
         return '%stemplates/%i/' % (settings.UPLOADTEMPLATE_MEDIA_ROOT,
                                      self.pk)
-
-    def zip_file(self, file_object):
-        """
-        Writes the ZIP file for this theme to file_object.
-        """
-        zip_file = zipfile.ZipFile(file_object, 'w')
-        config = ConfigParser()
-        config.add_section('Theme')
-        config.set('Theme', 'name', self.name)
-        config.set('Theme', 'description', self.description)
-        if self.thumbnail:
-            try:
-                name = os.path.basename(self.thumbnail.name)
-                thumbnail_data = self.thumbnail.read()
-            except IOError, e:
-                # For some reason, we could not download the thumbnail
-                # data.
-                logging.error(e)
-                logging.error("We failed to grab a theme thumbnail.")
-            else:
-                # If we successfully got the thumbnail, add it to the zip.
-                config.set('Theme', 'thumbnail', name)
-                zip_file.writestr('%s/%s' % (self.name.encode('utf8'),
-                                             name.encode('utf8')),
-                                  thumbnail_data)
-
-        meta_ini = StringIO()
-        config.write(meta_ini)
-
-        zip_file.writestr('%s/meta.ini' % self.name.encode('ascii'),
-                          meta_ini.getvalue())
-
-        data_paths = [('static', path) for path in
-                      getattr(settings, 'UPLOADTEMPLATE_STATIC_ROOTS', [])]
-        data_paths.extend([
-                ('templates', path) for path in
-                getattr(settings, 'UPLOADTEMPLATE_TEMPLATE_ROOTS', [])])
-        data_paths.append(('static', self.static_root()))
-        data_paths.append(('templates', self.template_dir()))
-
-        zip_files = {}
-        for zip_dir, root in data_paths:
-            for dirname, dirs, files in os.walk(root):
-                for filename in files:
-                    fullpath = os.path.join(dirname, filename)
-                    endpath = fullpath[len(root):]
-                    if endpath[0] == '/':
-                        endpath = endpath[1:]
-                    zip_files[os.path.join(self.name.encode('utf8'),
-                                       zip_dir, endpath)] = fullpath
-
-        for callback, response in pre_zip.send(sender=self,
-                                               file_paths=zip_files):
-            for path in response:
-                if path in zip_files:
-                    del zip_files[path]
-
-        for zippath, fullpath in zip_files.items():
-            zip_file.write(fullpath, zippath)
-
-        zip_file.close()
-
-pre_zip = Signal(providing_args=['file_paths'])
 
 def finished(sender, **kwargs):
     Theme.objects.clear_cache()

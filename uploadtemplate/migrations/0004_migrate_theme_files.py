@@ -22,7 +22,6 @@ class Migration(DataMigration):
         old_template = '{path}{dirname}/{pk}/'
         new_template = 'uploadtemplate/themes/{pk}/{dirname}/'
         dirnames = ('templates', 'static')
-        zip_root = 'theme'
 
         for theme in orm['uploadtemplate.Theme'].objects.all():
             sio = StringIO()
@@ -39,7 +38,7 @@ class Migration(DataMigration):
                             old_path = os.path.join(dir_path, filename)
                             name = old_path[len(old):]
                             new_path = os.path.join(new, name)
-                            zip_path = os.path.join(zip_root, dirname, name)
+                            zip_path = os.path.join(dirname, name)
                             with open(old_path, 'r') as fp:
                                 f = File(fp)
                                 if default_storage.exists(new_path):

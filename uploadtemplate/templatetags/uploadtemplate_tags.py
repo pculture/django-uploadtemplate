@@ -30,13 +30,13 @@ class ThemeStaticUrlNode(template.Node):
 
         if theme is not None:
             # Try the new location first.
-            base_dir = 'uploadtemplate/themes/{pk}/static'.format(pk=theme.pk)
-            name = os.path.join(base_dir, path)
+            name = os.path.join(theme.theme_files_dir, 'static', path)
             if default_storage.exists(name):
                 return default_storage.url(name)
 
+            # Backwards-compat: Allow old static paths as well.
             if os.path.exists(os.path.join(theme.static_root(), path)):
-                return urlparse.urljoin(base, path)
+                return urlparse.urljoin(theme.static_url(), path)
 
         if 'django.contrib.staticfiles' in settings.INSTALLED_APPS:
             from django.contrib.staticfiles.storage import staticfiles_storage
@@ -48,9 +48,9 @@ class ThemeStaticUrlNode(template.Node):
 def get_static_url(parser, token):
     bits = token.split_contents()
     if len(bits) == 3:
-        warnings.warn("get_static_url no longer takes a `bundled` kwarg",
+        warnings.warn("{tag_name} no longer takes a `bundled` kwarg".format(tag_name=bits[0]),
                       DeprecationWarning)
     elif len(bits) != 2:
-        raise template.TemplateSyntaxError('%s takes 1 arguments' % tokens[0])
+        raise template.TemplateSyntaxError('{tag_name} takes 1 arguments'.format(tag_name=bits[0]))
 
     return ThemeStaticUrlNode(parser.compile_filter(bits[1]))

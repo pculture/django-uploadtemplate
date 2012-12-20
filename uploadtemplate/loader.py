@@ -14,15 +14,14 @@ class Loader(filesystem.Loader):
             raise TemplateDoesNotExist, 'no default theme'
 
         # Try the new location first.
-        base_dir = 'uploadtemplate/themes/{pk}/templates'.format(pk=theme.pk)
-        name = os.path.join(base_dir, template_name)
+        name = os.path.join(theme.theme_files_dir, 'templates', template_name)
         if default_storage.exists(name):
             fp = default_storage.open(name)
             return (fp.read(), name)
 
         # Then fall back on the old location.
-        return filesystem.Loader.load_template_source(
-            self, template_name, [theme.template_dir()])
+        return super(Loader, self).load_template_source(template_name,
+                                                        [theme.template_dir()])
 
     load_template_source.is_usable = True
 
