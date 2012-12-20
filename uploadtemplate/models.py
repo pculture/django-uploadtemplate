@@ -1,6 +1,5 @@
 import os
 import shutil
-from StringIO import StringIO
 import zipfile
 
 from django.conf import settings
@@ -96,9 +95,7 @@ class Theme(models.Model):
             if filename.endswith('/'):
                 continue
             name = os.path.join(self.theme_files_dir, filename)
-            sio = StringIO()
-            sio.write(zip_file.read(filename))
-            fp = ContentFile(sio.read())
+            fp = ContentFile(zip_file.read(filename))
             if default_storage.exists(name):
                 default_storage.delete(name)
             default_storage.save(name, fp)
