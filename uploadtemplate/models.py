@@ -88,6 +88,9 @@ class Theme(models.Model):
         return 'uploadtemplate/themes/{pk}/'.format(pk=self.pk)
 
     def save_files(self):
+        if not self.theme_files_zip:
+            return
+
         zip_file = zipfile.ZipFile(self.theme_files_zip)
 
         # Unzip and replace any files.
@@ -116,12 +119,14 @@ class Theme(models.Model):
         zipfile.
 
         """
-        zip_file = zipfile.ZipFile(self.theme_files_zip)
+        if self.theme_files_zip:
+            zip_file = zipfile.ZipFile(self.theme_files_zip)
+            expected_files = set((os.path.join(self.theme_files_dir, name)
+                                  for name in zip_file.namelist()))
+        else:
+            expected_files = set()
 
-        expected_files = set((os.path.join(self.theme_files_dir, name)
-                              for name in zip_file.namelist()))
         found_files = set(self.list_files())
-
         to_prune = found_files - expected_files
         for name in to_prune:
             default_storage.delete(name)
