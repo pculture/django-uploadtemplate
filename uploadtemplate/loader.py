@@ -4,14 +4,18 @@ from django.core.files.storage import default_storage
 from django.template import TemplateDoesNotExist
 from django.template.loaders import filesystem
 
-from uploadtemplate import models
+from uploadtemplate.models import Theme
+from uploadtemplate.utils import is_protected_template
 
 class Loader(filesystem.Loader):
     def load_template_source(self, template_name, dirs=None):
         try:
-            theme = models.Theme.objects.get_current()
-        except models.Theme.DoesNotExist:
+            theme = Theme.objects.get_current()
+        except Theme.DoesNotExist:
             raise TemplateDoesNotExist, 'no default theme'
+
+        if is_protected_template(template_name):
+            raise TemplateDoesNotExist('Template name is protected')
 
         # Try the new location first.
         name = os.path.join(theme.theme_files_dir, 'templates', template_name)

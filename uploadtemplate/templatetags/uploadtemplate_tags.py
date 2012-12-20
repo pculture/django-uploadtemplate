@@ -1,3 +1,4 @@
+import re
 import os
 import urlparse
 import warnings
@@ -7,8 +8,12 @@ from django.conf import settings
 from django.core.files.storage import default_storage
 
 from uploadtemplate.models import Theme
+from uploadtemplate.utils import is_protected_static_file
+
 
 register = template.Library()
+
+
 
 class ThemeStaticUrlNode(template.Node):
     def __init__(self, path):
@@ -28,7 +33,7 @@ class ThemeStaticUrlNode(template.Node):
         if path.startswith('/'):
             path = path[1:]
 
-        if theme is not None:
+        if theme is not None and not is_protected_static_file(path):
             # Try the new location first.
             name = os.path.join(theme.theme_files_dir, 'static', path)
             if default_storage.exists(name):
