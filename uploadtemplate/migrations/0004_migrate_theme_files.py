@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import datetime
 import os
 from StringIO import StringIO
 import zipfile
@@ -9,6 +10,8 @@ from django.conf import settings
 from django.db import models
 from django.core.files.base import File, ContentFile
 from django.core.files.storage import default_storage
+from django.utils.encoding import force_unicode, smart_str
+
 
 class Migration(DataMigration):
 
@@ -22,6 +25,7 @@ class Migration(DataMigration):
         old_template = '{path}{dirname}/{pk}/'
         new_template = 'uploadtemplate/themes/{pk}/{dirname}/'
         dirnames = ('templates', 'static')
+        upload_to = 'uploadtemplate/files/%Y/%m/%d'
 
         for theme in orm['uploadtemplate.Theme'].objects.all():
             sio = StringIO()
@@ -49,8 +53,11 @@ class Migration(DataMigration):
                 zip_file.close()
 
             sio.seek(0)
-            name = theme._meta.get_field('theme_files_zip').generate_filename(theme, 'theme.zip')
-            theme.theme_files_zip = ContentFile(sio.read(), name=name)
+            directory_name = os.path.normpath(force_unicode(datetime.datetime.now().strftime(smart_str(upload_to))))
+            filename = os.path.normpath(default_storage.get_valid_name(os.path.basename('theme.zip')))
+            name = os.path.join(directory_name, filename)
+            name = default_storage.save(name, ContentFile(sio.read()))
+            theme.theme_files_zip = name
             theme.save()
 
     def backwards(self, orm):
