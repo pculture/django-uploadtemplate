@@ -1,0 +1,28 @@
+<a href="{% url uploadtemplate-create %}" class="add"><span>Add Theme</span></a>
+
+{% if default %}
+  <h2>Current Theme</h2>
+
+  {% if default.thumbnail %}<img src="{{ default.thumbnail }}" />{% endif %}
+ 
+  <h3>{{ default.name }}</h3>
+  <div >{{ default.description }}</div>
+  <a href="{% url uploadtemplate-update pk=default.pk %}">Edit</a>
+  <a href="{% url uploadtemplate-unset_default %}">Deactivate (Return to Default Theme)</a>
+{% endif %}
+
+{% if themes %}
+  {% if themes|length > 1 or not default %}
+    <h2>Themes</h2>
+    {% for theme in themes %}
+      {% if theme != default %}
+          {% if theme.thumbnail %}<img src="{{ theme.thumbnail }}" />{% endif %}
+          <h3>{{ theme.name }}</h3>
+          <div>{{ theme.description }}</div>
+          <a href="{% url uploadtemplate-set_default theme.pk %}">Activate</a>
+          <a href="{% url uploadtemplate-update pk=theme.pk %}">Edit</a>
+          <a href="{% url uploadtemplate-delete theme.pk %}">Remove</a>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endif %}
