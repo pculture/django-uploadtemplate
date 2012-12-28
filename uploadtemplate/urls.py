@@ -6,7 +6,7 @@ from uploadtemplate.views import ThemeIndexView, ThemeCreateView, ThemeUpdateVie
 urlpatterns = patterns('uploadtemplate.views',
     url(r'^$', ThemeIndexView.as_view(), name='uploadtemplate-index'),
     url(r'^add/$', ThemeCreateView.as_view(), name='uploadtemplate-create'),
-    url(r'^(?P<pk>\d+)/edit$', ThemeUpdateView.as_view(), name='uploadtemplate-edit'),
+    url(r'^(?P<pk>\d+)/edit$', ThemeUpdateView.as_view(), name='uploadtemplate-update'),
     # Backwards-compat - don't use pk kwarg here.
     url(r'^(\d+)/delete$', 'delete', name='uploadtemplate-delete'),
     url(r'^unset_default$', 'unset_default', name='uploadtemplate-unset_default'),
