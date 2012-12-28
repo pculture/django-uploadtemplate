@@ -5,6 +5,7 @@ from django.contrib.sites.models import Site
 from django.core.exceptions import ValidationError
 
 from uploadtemplate.models import Theme
+from uploadtemplate.utils import is_zipfile
 
 
 class ThemeForm(forms.ModelForm):
@@ -17,7 +18,7 @@ class ThemeForm(forms.ModelForm):
         if not value:
             return value
 
-        if not zipfile.is_zipfile(value):
+        if not is_zipfile(value):
             raise ValidationError('Must be a valid zip archive.')
 
         try:

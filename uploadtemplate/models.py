@@ -10,6 +10,9 @@ from django.core.signals import request_finished
 from django.db import models
 
 
+from uploadtemplate.utils import list_files
+
+
 class ThemeManager(models.Manager):
     def __init__(self):
         super(ThemeManager, self).__init__()
@@ -104,14 +107,8 @@ class Theme(models.Model):
                 default_storage.delete(name)
             default_storage.save(name, fp)
 
-    def list_files(self, root_dir=None):
-        if root_dir is None:
-            root_dir = self.theme_files_dir
-        directories, filenames = default_storage.listdir(root_dir)
-        files = [os.path.join(root_dir, name) for name in filenames]
-        for dirname in directories:
-            files.extend(self.list_files(os.path.join(root_dir, dirname)))
-        return files
+    def list_files(self):
+        return list_files(self.theme_files_dir)
 
     def prune_files(self):
         """

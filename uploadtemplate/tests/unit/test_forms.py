@@ -6,6 +6,7 @@ import mock
 from uploadtemplate.forms import ThemeForm
 from uploadtemplate.models import Theme
 from uploadtemplate.tests import BaseTestCase
+from uploadtemplate.utils import is_zipfile
 
 
 class ThemeFormTestCase(BaseTestCase):
@@ -33,21 +34,29 @@ class ThemeFormTestCase(BaseTestCase):
         form = ThemeForm()
         data_file = self._data_file('zips/empty.zip')
         form.cleaned_data = {'theme_files_zip': data_file}
-        with zipfile.ZipFile(data_file, 'r') as zip_file:
+        # Python 2.6 can't actually open this empty file because of a bug.
+        if is_zipfile(data_file):
+            zip_file = zipfile.ZipFile(data_file)
             self.assertEqual(len(zip_file.namelist()), 0)
-        self.assertRaisesMessage(ValidationError,
-                                 'Zip archive cannot be empty.',
-                                 form.clean_theme_files_zip)
+            zip_file.close()
+            self.assertRaisesMessage(ValidationError,
+                                     'Zip archive cannot be empty.',
+                                     form.clean_theme_files_zip)
+        else:
+            self.assertRaisesMessage(ValidationError,
+                                     'Must be a valid zip archive.',
+                                     form.clean_theme_files_zip)
         data_file.close()
 
     def test_clean_zip__evil_root(self):
         form = ThemeForm()
         data_file = self._data_file('zips/evil_root.zip')
         form.cleaned_data = {'theme_files_zip': data_file}
-        with zipfile.ZipFile(data_file, 'r') as zip_file:
-            namelist = zip_file.namelist()
-            self.assertEqual(len(namelist), 1)
-            self.assertTrue(namelist[0].startswith('/'))
+        zip_file = zipfile.ZipFile(data_file, 'r')
+        namelist = zip_file.namelist()
+        zip_file.close()
+        self.assertEqual(len(namelist), 1)
+        self.assertTrue(namelist[0].startswith('/'))
         self.assertRaisesMessage(ValidationError,
                                  'Zip archive contains invalid names.',
                                  form.clean_theme_files_zip)
@@ -57,10 +66,11 @@ class ThemeFormTestCase(BaseTestCase):
         form = ThemeForm()
         data_file = self._data_file('zips/evil_relative.zip')
         form.cleaned_data = {'theme_files_zip': data_file}
-        with zipfile.ZipFile(data_file, 'r') as zip_file:
-            namelist = zip_file.namelist()
-            self.assertEqual(len(namelist), 1)
-            self.assertTrue('..' in namelist[0].split('/'))
+        zip_file = zipfile.ZipFile(data_file, 'r')
+        namelist = zip_file.namelist()
+        zip_file.close()
+        self.assertEqual(len(namelist), 1)
+        self.assertTrue('..' in namelist[0].split('/'))
         self.assertRaisesMessage(ValidationError,
                                  'Zip archive contains invalid names.',
                                  form.clean_theme_files_zip)

@@ -26,10 +26,11 @@ class ThemeTestCase(BaseTestCase):
     def test_save_files(self):
         theme = self.create_theme(theme_zip='zips/theme.zip')
         file_list = ['static/logo.png', 'templates/uploadtemplate/index.html']
-        with zipfile.ZipFile(theme.theme_files_zip, 'r') as zf:
-            self.assertEqual(set([n for n in zf.namelist()
-                                  if not n.endswith('/')]),
-                             set(file_list))
+        zip_file = zipfile.ZipFile(theme.theme_files_zip, 'r')
+        self.assertEqual(set([n for n in zip_file.namelist()
+                              if not n.endswith('/')]),
+                         set(file_list))
+        zip_file.close()
         theme.delete_files()
         self.assertEqual(theme.list_files(), [])
         theme.save_files()
