@@ -11,6 +11,10 @@ from uploadtemplate.models import Theme
 class BaseTestCase(TestCase):
     urls = 'uploadtemplate.urls'
 
+    def setUp(self):
+        Theme.objects.clear_cache()
+        super(BaseTestCase, self).setUp()
+
     def _data_file_path(self, data_file):
         root = os.path.abspath(os.path.dirname(uploadtemplate.__file__))
         return os.path.join(root, 'tests', 'data', data_file)

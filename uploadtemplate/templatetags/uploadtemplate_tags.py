@@ -1,61 +1,32 @@
-import re
-import os
-import urlparse
+from __future__ import absolute_import
+
 import warnings
 
 from django import template
-from django.conf import settings
-from django.core.files.storage import default_storage
 
-from uploadtemplate.models import Theme
-from uploadtemplate.utils import is_protected_static_file
+from uploadtemplate.templatetags.uploadtemplate import static
 
 
 register = template.Library()
 
 
-
-class ThemeStaticUrlNode(template.Node):
+class GetStaticUrlNode(template.Node):
     def __init__(self, path):
         self.path = path
 
     def render(self, context):
-        if 'uploadtemplate_theme' in context:
-            theme = context['uploadtemplate_current_theme']
-        else:
-            try:
-                theme = Theme.objects.get_current()
-            except Theme.DoesNotExist:
-                theme = None
-            context['uploadtemplate_current_theme'] = theme
-
         path = self.path.resolve(context)
-        if path.startswith('/'):
-            path = path[1:]
+        return static(context, path)
 
-        if theme is not None and not is_protected_static_file(path):
-            # Try the new location first.
-            name = os.path.join(theme.theme_files_dir, 'static', path)
-            if default_storage.exists(name):
-                return default_storage.url(name)
-
-            # Backwards-compat: Allow old static paths as well.
-            if os.path.exists(os.path.join(theme.static_root(), path)):
-                return urlparse.urljoin(theme.static_url(), path)
-
-        if 'django.contrib.staticfiles' in settings.INSTALLED_APPS:
-            from django.contrib.staticfiles.storage import staticfiles_storage
-            return staticfiles_storage.url(path)
-
-        return urlparse.urljoin(settings.STATIC_URL, path)
 
 @register.tag
 def get_static_url(parser, token):
     bits = token.split_contents()
+    warnings.warn("{tag_name} is deprecated. Use uploadtemplate.static instead.".format(tag_name=bits[0]))
     if len(bits) == 3:
         warnings.warn("{tag_name} no longer takes a `bundled` kwarg".format(tag_name=bits[0]),
                       DeprecationWarning)
     elif len(bits) != 2:
-        raise template.TemplateSyntaxError('{tag_name} takes 1 arguments'.format(tag_name=bits[0]))
+        raise template.TemplateSyntaxError('{tag_name} takes 1 argument'.format(tag_name=bits[0]))
 
-    return ThemeStaticUrlNode(parser.compile_filter(bits[1]))
+    return GetStaticUrlNode(parser.compile_filter(bits[1]))
