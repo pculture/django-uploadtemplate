@@ -7,4 +7,4 @@ install:
   - pip install --use-mirrors --no-deps -r test_uploadtemplate_project/requirements.txt
 script:
   - cd test_uploadtemplate_project
-  - ./manage.py test uploatemplate --verbosity=2
+  - ./manage.py test uploadtemplate --verbosity=2
