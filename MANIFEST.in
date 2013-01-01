@@ -1,0 +1,6 @@
+include README.rst LICENSE MANIFEST.in
+include test_uploadtemplate_project/requirements.txt
+include test_uploadtemplate_project/manage.py
+include test_uploadtemplate_project/test_uploadtemplate_project/*.py
+recursive-include uploadtemplate/templates *.html
+recursive-include uploadtemplate/tests *.zip *.png *.gif *.html
