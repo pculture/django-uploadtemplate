@@ -154,7 +154,7 @@ class Theme(models.Model):
             else:
                 raise
         Theme.objects._post_save(None, self, None, None, using=self._state.db)
-        super(Theme, self).delete(self, *args, **kwargs)
+        super(Theme, self).delete(*args, **kwargs)
 
     # Required for backwards-compatibility shims for get_static_url.
     def static_root(self):
