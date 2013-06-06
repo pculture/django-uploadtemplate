@@ -46,6 +46,10 @@ class ThemeForm(forms.ModelForm):
         old_save_m2m = self.save_m2m
 
         def save_m2m():
+            if instance.default:
+                Theme.objects.exclude(pk=instance.pk
+                            ).filter(default=True
+                            ).update(default=False)
             old_save_m2m()
             instance.save_files()
             instance.prune_files()
